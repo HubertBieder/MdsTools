@@ -30,53 +30,8 @@ $script:RepoRoot = $PSScriptRoot
 # Skripte, die frueher nach $mdsDev kopiert wurden und entfallen sind (E9: UpdatePS.ps1 -> Update-PowerShell).
 $script:ObsoleteScripts = @('UpdatePS.ps1')
 
-function Get-UserHome() {
-    # In Domaenen mit Roaming-/Home-Verzeichnis kann $HOME (= HOMEDRIVE+HOMEPATH)
-    # vom tatsaechlichen Profil abweichen. Massgeblich ist %USERPROFILE%.
-    # Beispiel: als SCHWARTZ\Administrator angemeldet ->
-    #   $HOME            = C:\Users\Administrator          (falsch, lokales Profil)
-    #   $env:USERPROFILE = C:\Users\Administrator.SCHWARTZ (richtig)
-    # Unter macOS ist USERPROFILE nicht gesetzt -> $HOME.
-    if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE) -and (Test-Path -LiteralPath $env:USERPROFILE)) {
-        return $env:USERPROFILE
-    }
-    return $HOME
-}
-
-function Get-ProfileRoot() {
-    # Windows: ...\Documents\PowerShell   macOS: ~/.config/powershell
-    $base = Split-Path $PROFILE.CurrentUserAllHosts
-    # Zeigt der Profilpfad noch auf ein abweichendes $HOME (siehe Get-UserHome),
-    # auf %USERPROFILE% umbiegen, damit Profil und Module im echten Profil landen.
-    $userHome = Get-UserHome
-    if ($HOME -and ($userHome -ne $HOME) -and $base.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) {
-        $rel = $base.Substring($HOME.Length).TrimStart('\', '/')
-        $base = Join-Path $userHome $rel
-    }
-    if (-not (Test-Path -Path $base -PathType Container)) {
-        New-Item -Path $base -ItemType Directory -Force | Out-Null
-    }
-    return $base
-}
-
-function Get-CurrentUserModuleDir() {
-    # Deterministisch ableiten statt aus PSModulePath[0]:
-    #   Windows: ProfileRoot\Modules  (...\Documents\PowerShell\Modules)
-    #   macOS:   ~/.local/share/powershell/Modules - dort sucht PowerShell CurrentUser-Module,
-    #            NICHT unter ~/.config/powershell/Modules (Profilordner).
-    if ($IsWindows) {
-        $module = Join-Path (Get-ProfileRoot) 'Modules'
-    }
-    else {
-        # Wie PowerShell selbst: $XDG_DATA_HOME, sonst ~/.local/share
-        $dataHome = if ([string]::IsNullOrWhiteSpace($env:XDG_DATA_HOME)) { Join-Path $HOME '.local/share' } else { $env:XDG_DATA_HOME }
-        $module = Join-Path $dataHome 'powershell/Modules'
-    }
-    if (-not (Test-Path -Path $module -PathType Container)) {
-        New-Item -Path $module -ItemType Directory -Force | Out-Null
-    }
-    return $module
-}
+# Gemeinsame Pfad-Helfer: Get-UserHome, Get-ProfileRoot, Get-CurrentUserModuleDir
+. (Join-Path $PSScriptRoot 'InstallHelper.ps1')
 
 # Bricht ab, wenn mdsPackage noch installiert ist: gleiche Cmdlet-Namen, darf nie parallel geladen werden.
 function Assert-NoMdsPackage() {

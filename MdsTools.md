@@ -7,6 +7,7 @@
 | 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt                        |
 | 2026-10-31 | 0.2     | Hubert Bieder/Claude | Spezifikation korrigiert, Entscheidungen und offene Punkte ergänzt               |
 | 2026-10-31 | 0.3     | Hubert Bieder/Claude | Entscheidungen übernommen, Cmdlets umbenannt, Ausgabeordner wählbar              |
+| 2026-10-31 | 0.8     | Hubert Bieder/Claude | Schritt 6: Uninstall.ps1                                                         |
 | 2026-10-31 | 0.7     | Hubert Bieder/Claude | Globale Skripte auf Repo-Tabelle und Kurznamen umgestellt                        |
 | 2026-10-31 | 0.6     | Hubert Bieder/Claude | Schritt 5: Install.ps1 und Profil auf MdsTools umgestellt, UpdatePS.ps1 entfernt |
 | 2026-10-31 | 0.5     | Hubert Bieder/Claude | Umsetzung Schritte 1, 2 und 4; SkriptModule als *.ps1; Backup-Develop gefunden   |
@@ -92,6 +93,7 @@ global machen.
    MdsTools.md                 # diese Spezifikation
    Install.ps1                 # Installation (analog mdsPackage)
    Uninstall.ps1               # entfernt alte Installationen (bisher "clear.ps1")
+   InstallHelper.ps1           # gemeinsame Pfad-Helfer für Install.ps1 und Uninstall.ps1
    Modul/
       MdsTools/
          MdsTools.psd1         # Manifest, Version, Exportliste
@@ -275,7 +277,7 @@ Weitere Funktionen von mdsPackage, die nicht in der bisherigen Liste standen:
 
 ## Umsetzung
 
-Stand 2026-10-31: Schritte 1, 2, 4, 5 und 9 erledigt und auf LUNA installiert; von Schritt 3 nur `InitMDS.ps1` und
+Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt und auf LUNA installiert; von Schritt 3 nur `InitMDS.ps1` und
 `WoyEnv.ps1`. mdsPackage ist auf LUNA deinstalliert (Sicherung unter `~/Dev/Archiv/mdsPackage-Installation-2026-10-31`).
 
 1. Gerüst anlegen: `Modul/MdsTools/` mit Manifest, Root-Modul und `InitModule.ps1`.
