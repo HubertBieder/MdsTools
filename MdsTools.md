@@ -223,7 +223,7 @@ Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](#umbenennun
 | ---------------------------------------------------------------- | --------- | ------------ | ------ | -------------------------------------------------------------------------------------- |
 | `Write-Header`, `Write-Info`                                     | Base      | `Output.ps1` | ja     | in Make-Skripten verwendet                                                             |
 | `Write-Start`, `Write-Success`, `Write-Fail`                     | Base      | `Output.ps1` | ja     | einheitliche Ausgabe für `Make.ps1`                                                    |
-| `Publish-DotNet`, `Build-Project`                                | DevNet    | `Build.ps1`  | ja     | in Make-Skripten verwendet                                                             |
+| `Publish-DotNet`, `Build-Project`, `Invoke-Make`                 | DevNet    | `Build.ps1`  | ja     | in Make-Skripten verwendet; Invoke-Make für scripts/Make.ps1                           |
 | `Clear-BinFolder`                                                | FileIO    | `Build.ps1`  | ja     | in Make-Skripten verwendet                                                             |
 | `Get-TargetFramework`, `Find-CsProj`                             | DevNet    | `Build.ps1`  | nein   | nur intern genutzt                                                                     |
 | `Update-DotNet`, `Update-PowerShell`, `Show-PowerShell`          | Tools     | `Tools.ps1`  | ja     | interaktiv genutzt                                                                     |
