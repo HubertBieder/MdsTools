@@ -96,6 +96,45 @@ Describe 'go' {
     }
 }
 
+Describe 'mk' {
+    BeforeAll {
+        # Test-Repo mit einem Make.ps1, das seine Parameter in eine Datei schreibt
+        $script:protokoll = Join-Path $TestDrive 'mk-aufruf.txt'
+        $scripts = Join-Path $mdsRepos 'Net/scripts'
+        New-Item -ItemType Directory -Path $scripts -Force | Out-Null
+        Set-Content -Path (Join-Path $scripts 'Make.ps1') -Value @"
+param([string] `$Programm = '', [string] `$OutDir = '', [switch] `$List)
+"P=`$Programm|O=`$OutDir|L=`$List" | Set-Content '$($script:protokoll)'
+"@
+        New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'OhneMake') -Force | Out-Null
+    }
+    BeforeEach { Remove-Item $script:protokoll -ErrorAction SilentlyContinue }
+
+    It 'ruft scripts/Make.ps1 des Repos auf (Gross-/Kleinschreibung egal), auch von ausserhalb' {
+        Push-Location $TestDrive
+        try { mk NET } finally { Pop-Location }
+        Get-Content $script:protokoll | Should -Be 'P=|O=|L=False'
+    }
+
+    It 'reicht Programm, -OutDir und -List durch' {
+        mk net DKB.CLI -OutDir Test -List
+        Get-Content $script:protokoll | Should -Be 'P=DKB.CLI|O=Test|L=True'
+    }
+
+    It 'zeigt ohne Repo nur die Repos mit Make.ps1' {
+        $ausgabe = mk 6>&1 | Out-String
+        $ausgabe | Should -Match 'Net'
+        $ausgabe | Should -Not -Match 'OhneMake'
+        $script:protokoll | Should -Not -Exist
+    }
+
+    It 'meldet ein Repo ohne Make.ps1' {
+        $ausgabe = mk OhneMake 6>&1 | Out-String
+        $ausgabe | Should -Match 'Kein Repo'
+        $script:protokoll | Should -Not -Exist
+    }
+}
+
 Describe 'Ausgabeordner (Get-TargetDir)' {
     It 'Standard im Repo ist $mdsBin/Kurzname/Programm' {
         InModuleScope MdsTools {

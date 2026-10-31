@@ -7,6 +7,7 @@
 | 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt                                 |
 | 2026-10-31 | 0.2     | Hubert Bieder/Claude | Spezifikation korrigiert, Entscheidungen und offene Punkte ergänzt                        |
 | 2026-10-31 | 0.3     | Hubert Bieder/Claude | Entscheidungen übernommen, Cmdlets umbenannt, Ausgabeordner wählbar                       |
+| 2026-10-31 | 0.11    | Hubert Bieder/Claude | mk: Repo als erster Positionsparameter (`mk <Repo> [Programm]`)                           |
 | 2026-10-31 | 0.10    | Hubert Bieder/Claude | Schritt 8: Pester-Tests, ScriptAnalyzer-Einstellungen, process-Blöcke                     |
 | 2026-10-31 | 0.9     | Hubert Bieder/Claude | Schritt 7 (Teil): Invoke-Make, Make.ps1 in Net und Maui, *.app bleibt bei Clear-BinFolder |
 | 2026-10-31 | 0.8     | Hubert Bieder/Claude | Schritt 6: Uninstall.ps1                                                                  |
@@ -172,13 +173,16 @@ Arguments spielt keine Rolle.
 
 Jedes C#-Repo hat ein Verzeichnis `scripts/` mit **genau einem** Einstieg `Make.ps1`.
 
-| Aufruf          | Wirkung                                  |
-| --------------- | ---------------------------------------- |
-| `mk`            | alle Programme des aktuellen Repos bauen |
-| `mk <Programm>` | nur dieses Programm bauen                |
-| `mk -List`      | bekannte Programme anzeigen              |
+| Aufruf                                | Wirkung                               |
+| ------------------------------------- | ------------------------------------- |
+| `mk`                                  | Repos mit `scripts/Make.ps1` anzeigen |
+| `mk <Repo>`                           | alle Programme des Repos bauen        |
+| `mk <Repo> <Programm>`                | nur dieses Programm bauen             |
+| `mk <Repo> -List`                     | bekannte Programme des Repos anzeigen |
+| `mk <Repo> <Programm> -OutDir <Pfad>` | Ausgabeordner für diesen Lauf         |
 
-- `mk` ist eine Modulfunktion. Sie sucht vom aktuellen Ordner aus die Git-Root und ruft dort `scripts/Make.ps1` auf.
+- `mk` ist eine Modulfunktion und funktioniert von jedem Ordner aus. Sie ruft `$mdsRepos/<Repo>/scripts/Make.ps1` auf.
+- `<Repo>` ist der Kurzname wie bei `go` (Groß-/Kleinschreibung egal, Tab-Vervollständigung).
 - `Make.ps1` enthält oben eine Tabelle mit den Programmen des Repos (siehe Beispiel unten).
 - Konfiguration: `$mdsConfig/<Programm>/`.
 - Nach dem Build werden aus dem Ausgabeordner entfernt: `*.pdb`, XML-Dokumentation, fremde Runtimes
@@ -189,7 +193,7 @@ Jedes C#-Repo hat ein Verzeichnis `scripts/` mit **genau einem** Einstieg `Make.
 
 Der Ausgabeordner wird in dieser Reihenfolge bestimmt:
 
-1. Parameter `-OutDir` beim Aufruf (`mk MyApp -OutDir ~/Test`) – gilt nur für diesen Lauf.
+1. Parameter `-OutDir` beim Aufruf (`mk maui TestTool -OutDir ~/Test`) – gilt nur für diesen Lauf.
 2. Eintrag `OutDir` in der Programmtabelle von `Make.ps1`.
 3. Standard: `$mdsBin/<Kurzname>/<Programm>/`, z. B. `~/Dev/Root/Bin/Net/TaskAPI/`.
 
@@ -311,7 +315,7 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6, 8 und 9 erledigt, Schritt 7 zur Hälft
 - Danach gilt in einer neuen Shell:
   - `Get-Module MdsTools` zeigt die erwartete Version.
   - `go net` springt ins Repo `Net`.
-  - `mk` baut im Repo `Maui` alle Apps; Desktop-Programme landen gemeinsam in `Root/Bin/Desktop/`.
+  - `mk maui` baut alle Apps; Desktop-Programme landen gemeinsam in `Root/Bin/Desktop/`.
   - `Copy-FileWithCredential` kopiert auf LUNA und MARS eine Datei auf eine SMB-Freigabe.
 - Unter macOS werden keine `MdsSkripte` geladen und keine Fehler ausgegeben.
 - `Uninstall.ps1` hinterlässt weder mdsPackage noch MdsTools im Modulpfad.
