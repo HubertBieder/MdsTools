@@ -2,16 +2,17 @@
 
 ## Historie
 
-| Datum      | Version | Autor                | Änderung                                                                         |
-| ---------- | ------- | -------------------- | -------------------------------------------------------------------------------- |
-| 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt                        |
-| 2026-10-31 | 0.2     | Hubert Bieder/Claude | Spezifikation korrigiert, Entscheidungen und offene Punkte ergänzt               |
-| 2026-10-31 | 0.3     | Hubert Bieder/Claude | Entscheidungen übernommen, Cmdlets umbenannt, Ausgabeordner wählbar              |
-| 2026-10-31 | 0.8     | Hubert Bieder/Claude | Schritt 6: Uninstall.ps1                                                         |
-| 2026-10-31 | 0.7     | Hubert Bieder/Claude | Globale Skripte auf Repo-Tabelle und Kurznamen umgestellt                        |
-| 2026-10-31 | 0.6     | Hubert Bieder/Claude | Schritt 5: Install.ps1 und Profil auf MdsTools umgestellt, UpdatePS.ps1 entfernt |
-| 2026-10-31 | 0.5     | Hubert Bieder/Claude | Umsetzung Schritte 1, 2 und 4; SkriptModule als *.ps1; Backup-Develop gefunden   |
-| 2026-10-31 | 0.4     | Hubert Bieder/Claude | E3 und E9 entschieden                                                            |
+| Datum      | Version | Autor                | Änderung                                                                                  |
+| ---------- | ------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt                                 |
+| 2026-10-31 | 0.2     | Hubert Bieder/Claude | Spezifikation korrigiert, Entscheidungen und offene Punkte ergänzt                        |
+| 2026-10-31 | 0.3     | Hubert Bieder/Claude | Entscheidungen übernommen, Cmdlets umbenannt, Ausgabeordner wählbar                       |
+| 2026-10-31 | 0.9     | Hubert Bieder/Claude | Schritt 7 (Teil): Invoke-Make, Make.ps1 in Net und Maui, *.app bleibt bei Clear-BinFolder |
+| 2026-10-31 | 0.8     | Hubert Bieder/Claude | Schritt 6: Uninstall.ps1                                                                  |
+| 2026-10-31 | 0.7     | Hubert Bieder/Claude | Globale Skripte auf Repo-Tabelle und Kurznamen umgestellt                                 |
+| 2026-10-31 | 0.6     | Hubert Bieder/Claude | Schritt 5: Install.ps1 und Profil auf MdsTools umgestellt, UpdatePS.ps1 entfernt          |
+| 2026-10-31 | 0.5     | Hubert Bieder/Claude | Umsetzung Schritte 1, 2 und 4; SkriptModule als *.ps1; Backup-Develop gefunden            |
+| 2026-10-31 | 0.4     | Hubert Bieder/Claude | E3 und E9 entschieden                                                                     |
 
 ---
 
@@ -277,7 +278,7 @@ Weitere Funktionen von mdsPackage, die nicht in der bisherigen Liste standen:
 
 ## Umsetzung
 
-Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt und auf LUNA installiert; von Schritt 3 nur `InitMDS.ps1` und
+Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt, Schritt 7 zur Hälfte (siehe dort) und auf LUNA installiert; von Schritt 3 nur `InitMDS.ps1` und
 `WoyEnv.ps1`. mdsPackage ist auf LUNA deinstalliert (Sicherung unter `~/Dev/Archiv/mdsPackage-Installation-2026-10-31`).
 
 1. Gerüst anlegen: `Modul/MdsTools/` mit Manifest, Root-Modul und `InitModule.ps1`.
@@ -289,6 +290,13 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt und auf LUNA installiert
    - entfernt `mdsPackage` und `MdsTools` aus allen Benutzer-Modulpfaden,
    - sichert `$PROFILE` vor jeder Änderung.
 7. `Make.ps1` in `Net/scripts` und `Maui/scripts` einführen; alte `Make-*.ps1` danach entfernen.
+   - Erledigt: `Make.ps1` in beiden Repos (Programmtabelle + `Invoke-Make` aus MdsTools). Ersetzt
+     `Net/scripts/Make-All.ps1`, `Make-DKB.ps1`, `Maui/Make-MauiApps.ps1`, `Make-Single.ps1`.
+   - Offen bis zur Umstellung von MARS: Die alten Skripte bleiben, solange MARS mdsPackage nutzt.
+     Die Deploy-Skripte (`Make-TaskAPI`, `Make-RestSRV`, `Make-AufAPI`, `Make-My*`, `Make-TaskScheduler`,
+     `Make-Rebuild`) gehen **nicht** in `Make.ps1` auf: Sie stoppen/starten Dienste und IIS und werden aus
+     Programmen aufgerufen (`TaskAdminConfig.RebuildScript`, `GlobalConfig.cs`). Sie werden nur auf
+     MdsTools und die neuen Pfade umgestellt.
    Die alten Skripte rufen noch `Publish-NET` und `Build-Projects` auf und laufen mit MdsTools nicht mehr.
 8. Pester-Tests für `go`, Pfadauflösung und Export-Liste schreiben.
 9. `UpdatePS.ps1` aus `Skripte/` und aus `$mdsDev` entfernen (E9).
@@ -311,6 +319,7 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt und auf LUNA installiert
 - `NewToolMDS.md` anlegen oder Verweis entfernen.
 - Architektur der Mac-Builds: `Publish-DotNet` baut fest für `osx-x64` bzw. `maccatalyst-x64`, LUNA ist ein Apple-Silicon-Mac (arm64).
 - PSScriptAnalyzer installieren (Abnahmekriterium).
+- MAUI-Workloads auf LUNA fehlen (`dotnet workload restore` in `Repos/Maui`), `mk` in `Maui` baut daher auf dem Mac noch nicht.
 - Repo `MdsTools` auf GitHub ist noch leer: Erster Push von `Repos/Mds` steht aus (`git push -u origin main`).
 - Die Kurzbefehle `2Net`, `2Maui` … und der Alias `zip` des alten Profils entfallen (`go` bzw. `Save-Develop`).
 - Präfix für neue Cmdlets festlegen (z. B. `Mds`) – betrifft nur neue Funktionen, nicht die übernommenen.

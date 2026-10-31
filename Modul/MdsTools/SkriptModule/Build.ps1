@@ -6,7 +6,7 @@
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
 #
-# Oeffentlich: Publish-DotNet, Build-Project, Clear-BinFolder
+# Oeffentlich: Publish-DotNet, Build-Project, Clear-BinFolder, Invoke-Make
 #======================================================================
 
 # [intern] Liefert den Pfad der dotnet-Executable (script/Global:DotNetExe oder PATH); Fallback "dotnet".
@@ -399,7 +399,9 @@ function Clear-BinFolder {
                 Write-Verbose "No Files removed"
             }
             [int] $anz = 0
-            # Immer zu behaltende Funktions-/Asset-Ordner.
+            # Immer zu behaltende Funktions-/Asset-Ordner. Zusaetzlich bleiben alle *.app-Pakete
+            # (macOS/MAUI), sonst loescht ein Build in einen gemeinsamen Ordner die anderen Apps.
+            # 2026-10-31 Hubi/Claude: *.app ergaenzt
             $keepFolders = @('runtimes', 'images', 'wwwRoot', 'Microsoft.UI.Xaml', 'NpuDetect')
             # WinUI 3 (MAUI-Windows) laedt beim Start die nativen .mui-Ressourcen
             # passend zur UI-Sprache des Rechners. Fehlt der Ordner der aktuellen
@@ -414,7 +416,7 @@ function Clear-BinFolder {
             Write-Verbose "Behaltene Ordner: $($keepFolders -join ', ')"
             $ClearFolder = @()
             $ClearFolder = Get-ChildItem -LiteralPath $Folder -Force -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notin $keepFolders }
+            Where-Object { $_.Name -notin $keepFolders -and $_.Extension -ne '.app' }
             Remove-Folder -Folder (Join-Path -Path $Folder -ChildPath 'Debug') | Out-Null
             # WICHTIG: Schleifenvariable NICHT $folder nennen - sie kollidiert
             # mit dem [string]-Parameter $Folder (case-insensitiv). Dadurch
@@ -747,5 +749,86 @@ function Build-Project {
     else {
         Write-Host "Fertig!  ==> Erfolgreich: $erfolg  Fehlgeschlagen: $fehler" -ForegroundColor Cyan
     }
+    return ($fehler -eq 0)
+}
+
+# [public] Invoke-Make — Baut Programme eines Repos nach einer Programmtabelle. Wird von
+# <Repo>/scripts/Make.ps1 aufgerufen (und damit von mk).
+#   Programme  [ordered] Name -> @{ Projekt = <csproj relativ zu RepoRoot>
+#                                   OutDir  = <optional: relativ zu $mdsBin oder absolut>
+#                                   Nur     = <optional: 'Windows' oder 'MacOS'> }
+#   RepoRoot   Wurzel des Repos (Standard: aktueller Ordner)
+#   Programm   nur dieses Programm (Name aus der Tabelle, Gross-/Kleinschreibung egal)
+#   OutDir     Ausgabeordner fuer diesen Lauf, uebersteuert die Tabelle
+#   List       Tabelle anzeigen statt bauen
+# Ausgabeordner: -OutDir, sonst OutDir der Tabelle, sonst $mdsBin/<Kurzname>/<Projekt> (E10).
+# Rueckgabewert: $true, wenn alle ausgewaehlten Programme erfolgreich gebaut wurden.
+# 2026-10-31 Hubi/Claude: erstellt (MdsTools.md, Schritt 7)
+function Invoke-Make {
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true, HelpMessage = "Programmtabelle")]
+        [System.Collections.IDictionary] $Programme,
+
+        [Parameter(Mandatory = $false, HelpMessage = "Wurzel des Repos")]
+        [string] $RepoRoot = (Get-Location).Path,
+
+        [Parameter(Mandatory = $false, HelpMessage = "Nur dieses Programm")]
+        [string] $Programm = "",
+
+        [Parameter(Mandatory = $false, HelpMessage = "Ausgabeordner fuer diesen Lauf")]
+        [string] $OutDir = "",
+
+        [Parameter(Mandatory = $false, HelpMessage = "Programmtabelle anzeigen")]
+        [switch] $List
+    )
+    $repo = Get-RepoShortName $RepoRoot
+    if ($List) {
+        $Programme.Keys | ForEach-Object {
+            $p = $Programme[$_]
+            $ziel = if ($p.OutDir) { $p.OutDir } else { "$repo/$([System.IO.Path]::GetFileNameWithoutExtension($p.Projekt))" }
+            [pscustomobject]@{ Programm = $_; Ausgabe = $ziel; Nur = $p.Nur; Projekt = $p.Projekt }
+        } | Format-Table -AutoSize | Out-Host
+        return $true
+    }
+
+    $namen = @($Programme.Keys)
+    if ($Programm) {
+        $namen = @($Programme.Keys | Where-Object { $_ -eq $Programm })
+        if ($namen.Count -eq 0) {
+            Write-Fail "Unbekanntes Programm '$Programm'. Bekannt: $($Programme.Keys -join ', ')"
+            return $false
+        }
+    }
+
+    [int] $erfolg = 0
+    [int] $fehler = 0
+    [int] $uebersprungen = 0
+    Push-Location -LiteralPath $RepoRoot
+    try {
+        foreach ($name in $namen) {
+            $p = $Programme[$name]
+            if (($p.Nur -eq 'Windows' -and -not $IsWindows) -or ($p.Nur -eq 'MacOS' -and -not $IsMacOS)) {
+                Write-Info "$name wird nur unter $($p.Nur) gebaut - übersprungen"
+                $uebersprungen++
+                continue
+            }
+            $ziel = if ($OutDir) { $OutDir } elseif ($p.OutDir) { $p.OutDir } else { "" }
+            $projekt = Join-Path $RepoRoot $p.Projekt
+            if (Publish-DotNet -Path $projekt -TargetDir $ziel -Clear -Verbose:($VerbosePreference -eq 'Continue')) {
+                $erfolg++
+            }
+            else {
+                $fehler++
+            }
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $farbe = if ($fehler -eq 0) { 'Green' } else { 'Red' }
+    Write-Host "Fertig: $erfolg erfolgreich, $fehler fehlgeschlagen, $uebersprungen übersprungen" -ForegroundColor $farbe
     return ($fehler -eq 0)
 }

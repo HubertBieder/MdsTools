@@ -24,7 +24,7 @@
 
     FunctionsToExport = @(
         'Write-Header', 'Write-Start', 'Write-Info', 'Write-Success', 'Write-Fail',   # Output.ps1
-        'Publish-DotNet', 'Build-Project', 'Clear-BinFolder',                          # Build.ps1
+        'Publish-DotNet', 'Build-Project', 'Clear-BinFolder', 'Invoke-Make',           # Build.ps1
         'Clear-CodeFolder', 'Clear-Target', 'Remove-Folder',                           # FileIO.ps1
         'Backup-Develop', 'Get-OneDriveRoot',                                          # FileIO.ps1
         'Copy-FileWithCredential', 'Copy-FolderWithCredential',                        # Share.ps1
