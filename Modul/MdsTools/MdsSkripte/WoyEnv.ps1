@@ -75,7 +75,10 @@ function global:Import-WoyEnv {
 
 # [global] Baut eine PSCredential aus der woy.env (WOY_<NAME>_USER/_PASS). '*'/'!' -> interaktiv.
 # Rueckgabewert: PSCredential oder $null (Aufrufer bricht dann ab).
+# Die woy.env enthaelt das Passwort bewusst im Klartext (rechnerlokal unter ~/.woy).
 function global:Get-WoyCredential {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '',
+        Justification = 'Passwort steht in der rechnerlokalen woy.env im Klartext')]
     [CmdletBinding()]
     param(
         [Parameter(Position = 0, Mandatory = $true, HelpMessage = "Logischer Name, z. B. 'local' oder 'server'")]

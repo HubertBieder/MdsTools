@@ -7,6 +7,7 @@
 | 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt                                 |
 | 2026-10-31 | 0.2     | Hubert Bieder/Claude | Spezifikation korrigiert, Entscheidungen und offene Punkte ergänzt                        |
 | 2026-10-31 | 0.3     | Hubert Bieder/Claude | Entscheidungen übernommen, Cmdlets umbenannt, Ausgabeordner wählbar                       |
+| 2026-10-31 | 0.10    | Hubert Bieder/Claude | Schritt 8: Pester-Tests, ScriptAnalyzer-Einstellungen, process-Blöcke                     |
 | 2026-10-31 | 0.9     | Hubert Bieder/Claude | Schritt 7 (Teil): Invoke-Make, Make.ps1 in Net und Maui, *.app bleibt bei Clear-BinFolder |
 | 2026-10-31 | 0.8     | Hubert Bieder/Claude | Schritt 6: Uninstall.ps1                                                                  |
 | 2026-10-31 | 0.7     | Hubert Bieder/Claude | Globale Skripte auf Repo-Tabelle und Kurznamen umgestellt                                 |
@@ -116,7 +117,8 @@ global machen.
    Profile/
       profile.ps1              # wird nach $PROFILE kopiert
    Skripte/                    # globale Skripte (CloneAll, PushAll, …)
-   tests/                      # Pester-Tests
+   tests/                      # Pester-Tests (Invoke-Pester ./tests)
+   PSScriptAnalyzerSettings.psd1  # bewusst ausgeschlossene Analyzer-Regeln
 ```
 
 `Skripte/` wird von `Install.ps1` nach `$mdsDev` kopiert, aber nur, wenn die Quelle neuer ist.
@@ -278,7 +280,7 @@ Weitere Funktionen von mdsPackage, die nicht in der bisherigen Liste standen:
 
 ## Umsetzung
 
-Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt, Schritt 7 zur Hälfte (siehe dort) und auf LUNA installiert; von Schritt 3 nur `InitMDS.ps1` und
+Stand 2026-10-31: Schritte 1, 2, 4, 5, 6, 8 und 9 erledigt, Schritt 7 zur Hälfte (siehe dort) und auf LUNA installiert; von Schritt 3 nur `InitMDS.ps1` und
 `WoyEnv.ps1`. mdsPackage ist auf LUNA deinstalliert (Sicherung unter `~/Dev/Archiv/mdsPackage-Installation-2026-10-31`).
 
 1. Gerüst anlegen: `Modul/MdsTools/` mit Manifest, Root-Modul und `InitModule.ps1`.
@@ -299,6 +301,7 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt, Schritt 7 zur Hälfte (
      MdsTools und die neuen Pfade umgestellt.
    Die alten Skripte rufen noch `Publish-NET` und `Build-Projects` auf und laufen mit MdsTools nicht mehr.
 8. Pester-Tests für `go`, Pfadauflösung und Export-Liste schreiben.
+   Erledigt: `tests/MdsTools.Tests.ps1` (Aufruf `Invoke-Pester ./tests`), läuft im Pester-TestDrive.
 9. `UpdatePS.ps1` aus `Skripte/` und aus `$mdsDev` entfernen (E9).
 10. Sobald MdsTools auf LUNA und MARS funktioniert: `Repos/mdsPackage` lokal entfernen und auf GitHub archivieren (E3).
 
@@ -312,13 +315,13 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6 und 9 erledigt, Schritt 7 zur Hälfte (
   - `Copy-FileWithCredential` kopiert auf LUNA und MARS eine Datei auf eine SMB-Freigabe.
 - Unter macOS werden keine `MdsSkripte` geladen und keine Fehler ausgegeben.
 - `Uninstall.ps1` hinterlässt weder mdsPackage noch MdsTools im Modulpfad.
-- `Invoke-ScriptAnalyzer -Recurse` meldet keine Fehler.
+- `Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1` meldet keine Fehler.
+- `Invoke-Pester ./tests` läuft ohne Fehler.
 
 ## Offene Punkte
 
 - `NewToolMDS.md` anlegen oder Verweis entfernen.
 - Architektur der Mac-Builds: `Publish-DotNet` baut fest für `osx-x64` bzw. `maccatalyst-x64`, LUNA ist ein Apple-Silicon-Mac (arm64).
-- PSScriptAnalyzer installieren (Abnahmekriterium).
 - MAUI-Workloads auf LUNA fehlen (`dotnet workload restore` in `Repos/Maui`), `mk` in `Maui` baut daher auf dem Mac noch nicht.
 - Repo `MdsTools` auf GitHub ist noch leer: Erster Push von `Repos/Mds` steht aus (`git push -u origin main`).
 - Die Kurzbefehle `2Net`, `2Maui` … und der Alias `zip` des alten Profils entfallen (`go` bzw. `Save-Develop`).

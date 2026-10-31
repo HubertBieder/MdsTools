@@ -39,7 +39,7 @@ function Write-Header([string] $Message="", [int] $Level=0)
         1 { Write-Host ""; Write-Host $txt -ForegroundColor Black -BackgroundColor DarkGreen -NoNewline; Write-Host " " -ForegroundColor Gray -BackgroundColor Black }
         2 { Write-Host $txt -ForegroundColor Black -BackgroundColor Cyan -NoNewline; Write-Host " "  -ForegroundColor Gray -BackgroundColor Black}
         Default {Write-Host ""; Write-Host $txt -ForegroundColor DarkGray -BackgroundColor DarkBlue -NoNewline; Write-Host " " -ForegroundColor Gray -BackgroundColor Black }
-    }               
+    }
     Write-Host ""
 }
 
@@ -48,8 +48,8 @@ function Write-Start([string] $Message="")
 {
     [string] $txt = New-StatusLine -Message $Message -Prefix "===" -FillCharacter '=' -Width 68
     $txt = "#" + $txt + "#"
-    Write-Host $txt -ForegroundColor Black -BackgroundColor Gray -NoNewline; 
-    Write-Host "" -ForegroundColor Gray -BackgroundColor Black 
+    Write-Host $txt -ForegroundColor Black -BackgroundColor Gray -NoNewline;
+    Write-Host "" -ForegroundColor Gray -BackgroundColor Black
 }
 
 # [public] Write-Info — Gibt eine Info-Statuszeile aus.
@@ -65,7 +65,7 @@ function Write-Success([string] $Message="")
 {
     [string] $txt = New-StatusLine -Message $Message -Prefix "---" -FillCharacter '-'
     $txt = "+" + $txt
-    Write-Host $txt -ForegroundColor DarkGreen 
+    Write-Host $txt -ForegroundColor DarkGreen
 }
 
 # [public] Write-Fail — Gibt eine Fehler-Statuszeile (rot) aus.

@@ -165,13 +165,13 @@ function Copy-Folder {
             }
             else {
                 [void]$SourceFolder.Add($Source)
-            }  
+            }
         }
     }
     Process {
         [int]$all = 0
         [int]$anz = 0
-        if (!$shouldStop) {            
+        if (!$shouldStop) {
             foreach ($fld in $SourceFolder) {
                 $relativePath = Get-RelativePathSegment -RootPath $Source -ChildPath $fld
                 $targetFolder = if ([string]::IsNullOrWhiteSpace($relativePath)) { $Target } else { Join-Path -Path $Target -ChildPath $relativePath }
@@ -188,7 +188,7 @@ function Copy-Folder {
                     if (!(Test-Path -LiteralPath $targetFolder -PathType Container)) {
                         Write-Verbose "Create TargetDir: $targetFolder"
                         New-Item -Path $targetFolder -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
-                    }                    
+                    }
                     if ($Force) {
                         $quelle | Copy-Item -Destination $targetFolder -Force -ErrorAction SilentlyContinue
                         $anz += $quelle.Count
@@ -223,7 +223,7 @@ function Copy-Folder {
     }
     End {
         Write-Verbose "$anz Files from $all copied"
-        Write-Output $anz  
+        Write-Output $anz
     }
 }
 
@@ -243,7 +243,7 @@ function Get-DevelopFiles {
     )
     begin {
         [string[]] $files = @()
-        # Prüfen der Parameter      
+        # Prüfen der Parameter
         if ([string]::IsNullOrWhiteSpace($SourceDir)) {
             $SourceDir = (Get-Location).Path
         }
@@ -251,10 +251,10 @@ function Get-DevelopFiles {
             $SourceDir = Resolve-FileIoPath -Path $SourceDir
         }
         if (!(Test-Path -LiteralPath $SourceDir -PathType Container)) {
-            throw "! $SourceDir not found" 
+            throw "! $SourceDir not found"
         }
     }
-    process {               
+    process {
         #Bearbeiten der gefundenen Dateien
         $dateien = Get-ChildItem -LiteralPath $SourceDir -File -Force -ErrorAction SilentlyContinue
         [string[]] $lokal = @()
@@ -264,9 +264,9 @@ function Get-DevelopFiles {
             if (Test-Extension $datei.Name) {
                 $lokal += $datei.FullName
             }
-        }        
+        }
         $sum = $lokal.Count
-        Write-Verbose "[$sum] $SourceDir" 
+        Write-Verbose "[$sum] $SourceDir"
         $files = $lokal
         if (!$root) {
             # Suche nach weiteren Foldern
@@ -301,7 +301,7 @@ function Remove-OldFile {
         $Folder = Resolve-FileIoPath -Path $Folder
         $search = Join-Path -Path $Folder -ChildPath $Pattern
         if (!$Pattern.Contains("*")) {
-            $search = "$search*"      
+            $search = "$search*"
         }
         Write-Info "Remove-OldFile, $search on Max $Max"
         $dateien = Get-ChildItem -Path $search -File | Sort-Object LastWriteTime -Descending
@@ -313,7 +313,7 @@ function Remove-OldFile {
                     try {
                         Remove-Item -LiteralPath $dateien[$i].FullName -Force -ErrorAction SilentlyContinue
                         Write-Verbose $dateien[$i]
-                        $clear++                       
+                        $clear++
                     }
                     catch {
                     }
@@ -400,7 +400,7 @@ function Backup-Develop() {
         else {
             $sourceDir = Resolve-FileIoPath -Path $sourceDir
         }
-        $test = Join-Path -Path $sourceDir -ChildPath ".git" 
+        $test = Join-Path -Path $sourceDir -ChildPath ".git"
         if (Test-Path -LiteralPath $test -PathType Container) {
             $folderName = Split-Path $sourceDir -Leaf
         }
@@ -410,18 +410,18 @@ function Backup-Develop() {
         }
         if ($sourceDir.Length -gt 0) {
             if ($targetDir.Length -eq 0) {
-                ## Suche nach   D:\@HB\OneDrive - Familie Bieder\4_Backup    
+                ## Suche nach   D:\@HB\OneDrive - Familie Bieder\4_Backup
                 $targetDir = Get-OneDriveRoot "*_Backup"
             }
             if (($targetDir.Length -eq 0) -and $IsWindows) {
-                $drives = get-psdrive -psprovider "FileSystem" 
+                $drives = get-psdrive -psprovider "FileSystem"
                 foreach ($drive in $drives) {
                     $sub = $drive.Root + "_Backup"
                     if (Test-Path -Path $sub -PathType Container) {
                         $targetDir = $sub
                         break
                     }
-                }   
+                }
             }
             if ($targetDir.Length -eq 0) {
                 $targetDir = if ($IsWindows) { "D:\_Backup" } else { Join-Path $mdsRoot 'Backup' }
@@ -435,7 +435,7 @@ function Backup-Develop() {
             }
             $datum = Get-Date -Format yyyyMMdd
             $name = $folderName + "_" + "$datum.zip"
-            $archiv = Join-Path -Path $TargetDir -ChildPath $name     
+            $archiv = Join-Path -Path $TargetDir -ChildPath $name
             if ($force) {
                 Remove-Item -LiteralPath $archiv -Force -ErrorAction SilentlyContinue
             }
@@ -452,7 +452,7 @@ function Backup-Develop() {
             if ($sourceDir.Length -gt 0) {
                 Write-Info  "Backup [$sourceDir] ==> $archiv"
                 $dateien = Get-DevelopFiles -SourceDir $sourceDir
-                Copy-FileToZip -Files $dateien -Archiv $archiv -Root $sourceDir    
+                Copy-FileToZip -Files $dateien -Archiv $archiv -Root $sourceDir
                 $result = $true
             }
             else {
@@ -496,7 +496,7 @@ function Clear-CodeFolder([string]$Folder) {
                 }
             }
         }
-        Write-Success "Clear-DevelopFolder $Folder"        
+        Write-Success "Clear-DevelopFolder $Folder"
     }
 }
 
@@ -524,18 +524,18 @@ function Remove-Folder {
             }
             else {
                 Write-Verbose "Folder $Folder not existing"
-            }    
+            }
         }
         else {
             Write-Verbose "Foldername has to be defined"
-        }   
+        }
     }
     End {
         if ((-not [string]::IsNullOrWhiteSpace($Folder)) -and (!(Test-Path -LiteralPath $Folder))) {
             Write-Output $true
         }
         else {
-            Write-Output $false      
+            Write-Output $false
         }
     }
 }

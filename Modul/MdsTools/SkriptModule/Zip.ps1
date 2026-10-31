@@ -193,7 +193,7 @@ function Export-FromZip {
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $false, HelpMessage = "Path of a zipfile to extract")]
+        [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path of a zipfile to extract")]
         [ValidateScript({ Test-Path $_ -PathType Leaf })]
         [string]$Archive ,
 
@@ -249,7 +249,7 @@ function Get-ZipEntry {
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $false, HelpMessage = "Path of a zipfile to extract")]
+        [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Path of a zipfile to extract")]
         [ValidateScript({ Test-Path $_ })]
         [string]$Archive
     )
