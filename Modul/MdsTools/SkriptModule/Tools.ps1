@@ -1,0 +1,447 @@
+#======================================================================
+# Datei:        Tools.ps1  (wird von MdsTools.psm1 dot-gesourct)
+# Beschreibung: Anzeigen und Aktualisieren von PowerShell 7 und .NET-SDK (Windows und macOS).
+#
+# Versionshistorie:
+#   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
+#                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
+#
+# Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell
+#======================================================================
+
+# [intern] Ermittelt die hoechste im winget-Repository verfuegbare Version eines Pakets.
+#   PackageId  winget-Paket-ID
+# Rueckgabewert: [version] der neuesten verfuegbaren Version, sonst [version]"0.0.0".
+function Get-WingetAvailableVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, Mandatory = $true, HelpMessage = "winget-Paket-ID")]
+        [string] $PackageId
+    )
+
+    try {
+        # --source winget: Mehrdeutigkeit mit der msstore-Quelle vermeiden.
+        # ANSI/VT-Codes entfernen: neuere winget-Versionen geben Steuerzeichen aus
+        # (auch mit --disable-interactivity), sonst matcht die Version-Zeile nicht.
+        $ausgabe = winget show --id $PackageId --exact --source winget `
+            --accept-source-agreements --disable-interactivity 2>$null |
+            ForEach-Object { $_ -replace '\x1b\[[0-9;?]*[A-Za-z]', '' }
+        # "Version: 7.6.3" (Ressourcen geladen) oder "ShowLabelVersion 7.6.3" (roher Schluessel).
+        $verZeile = $ausgabe | Where-Object { $_ -match '(?i)^\s*(ShowLabel)?Version\b' } | Select-Object -First 1
+        if ($verZeile -and $verZeile -match '([0-9]+(\.[0-9]+)+)') {
+            return [version]$Matches[1]
+        }
+    }
+    catch { }
+
+    return [version]"0.0.0"
+}
+
+# [intern] Ermittelt die hoechste veroeffentlichte Version ueber die GitHub-Releases-API.
+# Sinnvoll, wenn der winget-Index hinterherhinkt (z. B. PowerShell 7.6.3 auf GitHub,
+# in winget aber noch 7.6.2).
+#   Repository  GitHub-Repository "Besitzer/Repo"
+function Get-GithubLatestVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, Mandatory = $true, HelpMessage = "GitHub-Repository in der Form 'Besitzer/Repo'")]
+        [string] $Repository
+    )
+
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" `
+            -Headers @{ 'User-Agent' = 'MdsTools' } -TimeoutSec 10
+        if ($release.tag_name -and $release.tag_name -match '([0-9]+(\.[0-9]+)+)') {
+            return [version]$Matches[1]
+        }
+    }
+    catch { }
+
+    return [version]"0.0.0"
+}
+
+# [intern] Ermittelt die Version der installierten pwsh (nicht der laufenden Sitzung).
+# Windows: maschinenweite Installation unter Program Files; sonst pwsh aus dem PATH.
+# Rueckgabewert: [version], [version]"0.0.0" wenn nicht ermittelbar.
+function Get-InstalledPwshVersion {
+    try {
+        if ($IsWindows) {
+            $pwshExe = "C:\Program Files\PowerShell\7\pwsh.exe"
+            if (Test-Path -LiteralPath $pwshExe) {
+                return [version]((Get-Item -LiteralPath $pwshExe).VersionInfo.ProductVersion -replace '[^0-9.].*$')
+            }
+            return [version]"0.0.0"
+        }
+        $ausgabe = & pwsh -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+        return [version]($ausgabe -replace '-.*$', '')
+    }
+    catch { return [version]"0.0.0" }
+}
+
+# [intern] Laedt ein Asset des neuesten GitHub-Releases (Muster mit Platzhaltern) ins
+# Temp-Verzeichnis. Rueckgabewert: Pfad der Datei oder $null.
+function Save-GithubReleaseAsset([string] $Repository, [string] $Pattern) {
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" `
+            -Headers @{ 'User-Agent' = 'MdsTools' } -TimeoutSec 30
+        $asset = $release.assets | Where-Object name -like $Pattern | Select-Object -First 1
+        if (-not $asset) {
+            Write-Error "Kein Download für Muster '$Pattern' im neuesten Release von $Repository gefunden."
+            return $null
+        }
+        $datei = Join-Path ([System.IO.Path]::GetTempPath()) $asset.name
+        Write-Host "Lade $($asset.name) ..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $datei -UseBasicParsing
+        return $datei
+    }
+    catch {
+        Write-Error "Download von GitHub fehlgeschlagen: $_"
+        return $null
+    }
+}
+
+# [intern] Installiert das .NET-SDK winget-frei ueber das offizielle Skript (https://dot.net).
+# Laedt dotnet-install.ps1, fuehrt es maschinenweit in einem eigenen Prozess aus
+# (ExecutionPolicy Bypass; ein evtl. 'exit' beendet so NICHT die Sitzung) und nimmt
+# $InstallDir dauerhaft in die Maschinen-PATH auf. Laeuft auch aus Windows PowerShell 5.1.
+#   Channel     SDK-Kanal, z. B. '10.0' oder 'LTS'
+#   InstallDir  Installationsverzeichnis (maschinenweit)
+# Rueckgabewert: $true bei Erfolg, sonst $false.
+function Install-DotNetFromOfficial {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, HelpMessage = "SDK-Kanal, z. B. '10.0' oder 'LTS'")]
+        [string] $Channel = "LTS",
+
+        [Parameter(Position = 1, HelpMessage = "Installationsverzeichnis (maschinenweit)")]
+        [string] $InstallDir = "$env:ProgramFiles\dotnet"
+    )
+
+    try {
+        $scriptPfad = Join-Path $env:TEMP 'dotnet-install.ps1'
+        Write-Host "Lade dotnet-install.ps1 ..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $scriptPfad -UseBasicParsing
+
+        Write-Host "Installiere .NET-SDK (Kanal $Channel) nach $InstallDir ..." -ForegroundColor Yellow
+        # Im Kindprozess ausfuehren (Isolation: ein 'throw'/'exit' beendet nicht die
+        # aktuelle Sitzung). TLS 1.2 MUSS hier separat gesetzt werden - der Kindprozess
+        # erbt unsere Einstellung nicht, und dotnet-install.ps1 setzt sie unter WinPS 5.1
+        # nicht selbst (sonst "Unable to download ...zip"). Pfade in Einfachquotes wegen
+        # Leerzeichen (z. B. 'C:\Program Files\dotnet').
+        $cmd = "[Net.ServicePointManager]::SecurityProtocol = " +
+               "[Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; " +
+               "& '$scriptPfad' -Channel $Channel -InstallDir '$InstallDir' -Architecture x64"
+        $argLine = "-NoProfile -ExecutionPolicy Bypass -Command `"$cmd`""
+        $prozess = Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList $argLine
+        Remove-Item -LiteralPath $scriptPfad -ErrorAction SilentlyContinue
+
+        if ($prozess.ExitCode -ne 0) {
+            Write-Error "dotnet-install fehlgeschlagen (Exit-Code $($prozess.ExitCode)). Hinweis: maschinenweite Installation nach '$InstallDir' erfordert erhöhte Rechte."
+            return $false
+        }
+
+        # dotnet in die PATH aufnehmen: aktuelle Sitzung sofort, Maschine dauerhaft.
+        if (($env:PATH -split ';') -notcontains $InstallDir) {
+            $env:PATH = "$InstallDir;$env:PATH"
+        }
+        try {
+            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+            if (($machinePath -split ';') -notcontains $InstallDir) {
+                [Environment]::SetEnvironmentVariable('Path', "$machinePath;$InstallDir", 'Machine')
+            }
+        }
+        catch {
+            Write-Warning "PATH (Maschine) konnte nicht dauerhaft ergänzt werden (Rechte?). In neuen Sitzungen ggf. '$InstallDir' manuell ergänzen."
+        }
+        return $true
+    }
+    catch {
+        Write-Error "Installation über dotnet-install.ps1 fehlgeschlagen: $_"
+        return $false
+    }
+}
+
+# [intern] Laedt die x64-MSI des neuesten PowerShell-7-Releases von GitHub und installiert
+# sie maschinenweit per msiexec. Sinnvoll, wenn der winget-Index hinterherhinkt. Laeuft
+# auch aus Windows PowerShell 5.1 (setzt TLS 1.2), also fuer den Erst-Bootstrap geeignet.
+#   Repository  GitHub-Repository "Besitzer/Repo"
+# Rueckgabewert: $true bei erfolgreicher Installation, sonst $false.
+function Install-PowerShell7FromGithub {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, HelpMessage = "GitHub-Repository in der Form 'Besitzer/Repo'")]
+        [string] $Repository = "PowerShell/PowerShell"
+    )
+
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" `
+            -Headers @{ 'User-Agent' = 'MdsTools' } -TimeoutSec 30
+        $asset = $release.assets | Where-Object { $_.name -match 'win-x64\.msi$' } | Select-Object -First 1
+        if (-not $asset) {
+            Write-Error "Kein win-x64-MSI-Asset im neuesten Release von $Repository gefunden."
+            return $false
+        }
+
+        $msiPfad = Join-Path $env:TEMP $asset.name
+        Write-Host "Lade $($asset.name) ..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $msiPfad -UseBasicParsing
+
+        $prozess = Start-Process msiexec.exe `
+            -ArgumentList "/i `"$msiPfad`" /quiet /norestart" -Wait -PassThru
+        Remove-Item -LiteralPath $msiPfad -ErrorAction SilentlyContinue
+
+        if ($prozess.ExitCode -ne 0) {
+            Write-Error "msiexec fehlgeschlagen (Exit-Code $($prozess.ExitCode)). Hinweis: maschinenweite Installation erfordert erhöhte Rechte."
+            return $false
+        }
+        return $true
+    }
+    catch {
+        Write-Error "Installation von GitHub fehlgeschlagen: $_"
+        return $false
+    }
+}
+
+# [public] Update-DotNet — Prueft die installierte .NET-SDK-Version und aktualisiert
+# sie ohne Bedienereingriff, falls sie unter der Zielversion liegt. Standardweg ist
+# winget-FREI ueber dotnet-install (https://dot.net; laeuft auch aus WinPS 5.1). Mit
+# -UseWinget stattdessen der winget-Weg. ERFORDERT ADMINRECHTE (maschinenweite Installation).
+#   MinVersion  Mindest-Zielversion
+#   Channel     SDK-Kanal ('10.0','LTS'); leer -> aus MinVersion abgeleitet
+#   InstallDir  Installationsverzeichnis (maschinenweit)
+#   UseWinget   Statt dotnet-install den winget-Weg nutzen
+#   PackageId   winget-Paket-ID (nur mit -UseWinget)
+# Rueckgabewert: $true wenn aktuell genug (oder Update erfolgreich), sonst $false.
+function Update-DotNet {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, HelpMessage = "Mindest-Zielversion")]
+        [version] $MinVersion = [version]"10.0.301",
+
+        [Parameter(Position = 1, HelpMessage = "SDK-Kanal (z. B. '10.0', 'LTS'); leer -> aus MinVersion abgeleitet")]
+        [string] $Channel = "",
+
+        [Parameter(HelpMessage = "Installationsverzeichnis (maschinenweit)")]
+        [string] $InstallDir = "$env:ProgramFiles\dotnet",
+
+        [Parameter(HelpMessage = "Statt dotnet-install den winget-Weg nutzen")]
+        [switch] $UseWinget,
+
+        [Parameter(HelpMessage = "winget-Paket-ID (nur mit -UseWinget)")]
+        [string] $PackageId = "Microsoft.DotNet.SDK.10"
+    )
+
+    $aktuell = try { [version](dotnet --version 2>$null) } catch { [version]"0.0.0" }
+
+    if ($aktuell -ge $MinVersion) {
+        Write-Host ".NET ist aktuell ($aktuell)" -ForegroundColor Green
+        return $true
+    }
+
+    # macOS: ueber Homebrew (cask dotnet-sdk); ohne Homebrew nur Hinweis auf den Download.
+    if ($IsMacOS) {
+        $brewCask = $false
+        if (Get-Command brew -ErrorAction SilentlyContinue) {
+            & brew list --cask dotnet-sdk *> $null
+            $brewCask = ($LASTEXITCODE -eq 0)
+        }
+        if ($brewCask) {
+            & brew update
+            & brew upgrade --cask dotnet-sdk
+        }
+        else {
+            Write-Warning "Bitte das .NET-SDK von https://dotnet.microsoft.com/download installieren (oder 'brew install --cask dotnet-sdk')."
+            return $false
+        }
+        $neu = try { [version](dotnet --version 2>$null) } catch { [version]"0.0.0" }
+        if ($neu -ge $MinVersion) {
+            Write-Host ".NET aktualisiert ($aktuell -> $neu)" -ForegroundColor Green
+            return $true
+        }
+        Write-Error "Update durchgeführt, aber Version weiterhin zu niedrig ($neu)."
+        return $false
+    }
+
+    # Erst wenn wirklich installiert werden muss, Adminrechte einfordern.
+    if (-not (Assert-Admin "Das Aktualisieren des .NET-SDK")) { return $false }
+
+    Write-Host "Update nötig ($aktuell -> $MinVersion) ..." -ForegroundColor Yellow
+
+    if ($UseWinget) {
+        Write-Host "Installiere $PackageId über winget ..." -ForegroundColor Yellow
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Write-Error "winget ist nicht installiert/verfügbar. Installation nicht möglich."
+            return $false
+        }
+        winget install --id $PackageId --silent `
+            --accept-package-agreements --accept-source-agreements --disable-interactivity
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "winget-Installation fehlgeschlagen (Exit-Code $LASTEXITCODE)."
+            return $false
+        }
+    }
+    else {
+        # Kanal aus MinVersion ableiten (z. B. 10.0.301 -> '10.0'), falls nicht gesetzt.
+        if ([string]::IsNullOrWhiteSpace($Channel)) {
+            $Channel = "$($MinVersion.Major).$($MinVersion.Minor)"
+        }
+        if (-not (Install-DotNetFromOfficial -Channel $Channel -InstallDir $InstallDir)) {
+            return $false
+        }
+    }
+
+    # Nach dem Update erneut pruefen
+    $neu = try { [version](dotnet --version 2>$null) } catch { [version]"0.0.0" }
+    if ($neu -ge $MinVersion) {
+        Write-Host ".NET aktualisiert ($aktuell -> $neu)" -ForegroundColor Green
+        return $true
+    }
+
+    Write-Error "Update durchgeführt, aber Version weiterhin zu niedrig ($neu)."
+    return $false
+}
+
+# [public] Update-PowerShell — Prueft die installierte PowerShell-7-Version und
+# aktualisiert sie, falls sie unter der Zielversion liegt. Mit -Last ist das Ziel die
+# neueste GitHub-Release-Version.
+#   Windows: winget (maschinenweit) bzw. mit -Last MSI direkt von GitHub; erfordert Adminrechte.
+#   macOS:   Homebrew (cask powershell), falls darueber installiert, sonst PKG von GitHub
+#            per 'sudo installer' (fragt nach dem Passwort).
+#   MinVersion  Mindest-Zielversion
+#   PackageId   winget-Paket-ID (nur Windows)
+#   Last        Auf die neueste GitHub-Release-Version aktualisieren
+# Rueckgabewert: $true wenn aktuell genug (oder Update erfolgreich), sonst $false.
+# 2026-10-31 Hubi/Claude: macOS-Zweig aus UpdatePS.ps1 uebernommen (E9), UpdatePS.ps1 entfaellt
+function Update-PowerShell {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, HelpMessage = "Mindest-Zielversion")]
+        [version] $MinVersion = [version]"7.6.2",
+
+        [Parameter(Position = 1, HelpMessage = "winget-Paket-ID (nur Windows)")]
+        [string] $PackageId = "Microsoft.PowerShell",
+
+        [Parameter(HelpMessage = "Auf die neueste GitHub-Release-Version aktualisieren")]
+        [switch] $Last
+    )
+
+    $aktuell = Get-InstalledPwshVersion
+
+    # Bei -Last die neueste GitHub-Version als Ziel verwenden
+    if ($Last) {
+        $githubNeueste = Get-GithubLatestVersion -Repository 'PowerShell/PowerShell'
+        if ($githubNeueste -gt $MinVersion) { $MinVersion = $githubNeueste }
+    }
+
+    if ($aktuell -ge $MinVersion) {
+        Write-Host "PowerShell 7 ist aktuell ($aktuell)" -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host "Update nötig ($aktuell -> $MinVersion) ..." -ForegroundColor Yellow
+
+    if ($IsMacOS) {
+        $brewCask = $false
+        if (Get-Command brew -ErrorAction SilentlyContinue) {
+            & brew list --cask powershell *> $null
+            $brewCask = ($LASTEXITCODE -eq 0)
+        }
+        if ($brewCask) {
+            & brew update
+            & brew upgrade --cask powershell
+        }
+        else {
+            $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+            $pkg = Save-GithubReleaseAsset -Repository 'PowerShell/PowerShell' -Pattern "*osx-$arch.pkg"
+            if (-not $pkg) { return $false }
+            Write-Host 'Installation benötigt Admin-Rechte (sudo) ...'
+            & sudo installer -pkg $pkg -target /
+            Remove-Item -LiteralPath $pkg -ErrorAction SilentlyContinue
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Update meldete Exit-Code $LASTEXITCODE."
+            return $false
+        }
+    }
+    elseif ($IsWindows) {
+        # Erst wenn wirklich installiert werden muss, Adminrechte einfordern.
+        if (-not (Assert-Admin "Das Aktualisieren von PowerShell 7")) { return $false }
+
+        if ($Last) {
+            # Direkt von GitHub installieren, da der winget-Index oft hinterherhinkt
+            if (-not (Install-PowerShell7FromGithub)) { return $false }
+        }
+        else {
+            Write-Host "Installiere $PackageId (maschinenweit) über winget ..." -ForegroundColor Yellow
+            if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+                Write-Error "winget ist nicht installiert/verfügbar. Installation nicht möglich."
+                return $false
+            }
+            winget install --id $PackageId --scope machine --silent `
+                --accept-package-agreements --accept-source-agreements --disable-interactivity
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "winget-Installation fehlgeschlagen (Exit-Code $LASTEXITCODE). Hinweis: maschinenweite Installation erfordert erhöhte Rechte."
+                return $false
+            }
+        }
+    }
+    else {
+        Write-Error "Update-PowerShell unterstützt nur Windows und macOS."
+        return $false
+    }
+
+    # Nach dem Update erneut pruefen
+    $neu = Get-InstalledPwshVersion
+    if ($neu -ge $MinVersion) {
+        Write-Host "PowerShell 7 aktualisiert ($aktuell -> $neu). Bitte offene pwsh-Fenster neu starten." -ForegroundColor Green
+        return $true
+    }
+
+    Write-Error "Update durchgeführt, aber Version weiterhin zu niedrig ($neu)."
+    return $false
+}
+
+# [public] Show-PowerShell — Zeigt Informationen zur laufenden PowerShell und zum .NET-SDK:
+# aktuelle Version sowie die hoechste verfuegbare Version (Max aus winget und GitHub-Releases).
+# Reine Anzeige, keine Adminrechte noetig.
+#   PowerShellPackageId  winget-Paket-ID der PowerShell
+#   DotNetPackageId      winget-Paket-ID des .NET-SDK
+function Show-PowerShell {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, HelpMessage = "winget-Paket-ID der PowerShell")]
+        [string] $PowerShellPackageId = "Microsoft.PowerShell",
+
+        [Parameter(Position = 1, HelpMessage = "winget-Paket-ID des .NET-SDK")]
+        [string] $DotNetPackageId = "Microsoft.DotNet.SDK.10"
+    )
+
+    # --- PowerShell ---
+    $psPfad = try { (Get-Process -Id $PID).Path } catch { $null }
+    if ([string]::IsNullOrWhiteSpace($psPfad)) {
+        $exe = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
+        $psPfad = Join-Path $PSHOME $exe
+    }
+    $psAktuell = $PSVersionTable.PSVersion
+    # winget hinkt teils hinterher -> hoechste Version aus winget und GitHub nehmen
+    $psWinget = if ($IsWindows) { Get-WingetAvailableVersion -PackageId $PowerShellPackageId } else { [version]"0.0.0" }
+    $psGithub = Get-GithubLatestVersion -Repository 'PowerShell/PowerShell'
+    $psVerfuegbar = if ($psGithub -gt $psWinget) { $psGithub } else { $psWinget }
+
+    Write-Host "PowerShell" -ForegroundColor Cyan
+    Write-Host "  Pfad:       $psPfad"
+    Write-Host "  Version:    $psAktuell"
+    if ($IsWindows) { Write-Host "  winget:     $psWinget" -ForegroundColor $(if ($psWinget -gt $psAktuell) { 'Yellow' } else { 'Green' }) }
+    Write-Host "  GitHub:     $psGithub" -ForegroundColor $(if ($psGithub -gt $psAktuell) { 'Yellow' } else { 'Green' })
+    Write-Host "  Verfügbar: $psVerfuegbar" -ForegroundColor $(if ($psVerfuegbar -gt $psAktuell) { 'Yellow' } else { 'Green' })
+
+    # --- .NET-SDK ---
+    $netAktuell = try { [version](dotnet --version 2>$null) } catch { [version]"0.0.0" }
+    $netVerfuegbar = if ($IsWindows) { Get-WingetAvailableVersion -PackageId $DotNetPackageId } else { [version]"0.0.0" }
+
+    Write-Host ".NET-SDK" -ForegroundColor Cyan
+    Write-Host "  Version:    $netAktuell"
+    if ($IsWindows) {
+        Write-Host "  Verfügbar: $netVerfuegbar" -ForegroundColor $(if ($netVerfuegbar -gt $netAktuell) { 'Yellow' } else { 'Green' })
+    }
+}
