@@ -7,6 +7,7 @@
 | 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt                        |
 | 2026-10-31 | 0.2     | Hubert Bieder/Claude | Spezifikation korrigiert, Entscheidungen und offene Punkte ergänzt               |
 | 2026-10-31 | 0.3     | Hubert Bieder/Claude | Entscheidungen übernommen, Cmdlets umbenannt, Ausgabeordner wählbar              |
+| 2026-10-31 | 0.7     | Hubert Bieder/Claude | Globale Skripte auf Repo-Tabelle und Kurznamen umgestellt                        |
 | 2026-10-31 | 0.6     | Hubert Bieder/Claude | Schritt 5: Install.ps1 und Profil auf MdsTools umgestellt, UpdatePS.ps1 entfernt |
 | 2026-10-31 | 0.5     | Hubert Bieder/Claude | Umsetzung Schritte 1, 2 und 4; SkriptModule als *.ps1; Backup-Develop gefunden   |
 | 2026-10-31 | 0.4     | Hubert Bieder/Claude | E3 und E9 entschieden                                                            |
@@ -308,7 +309,7 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5 und 9 erledigt und auf LUNA installiert; v
 - `NewToolMDS.md` anlegen oder Verweis entfernen.
 - Architektur der Mac-Builds: `Publish-DotNet` baut fest für `osx-x64` bzw. `maccatalyst-x64`, LUNA ist ein Apple-Silicon-Mac (arm64).
 - PSScriptAnalyzer installieren (Abnahmekriterium).
-- Globale Skripte (`CloneAll`, `CloneMDS`, `PushAll` …) arbeiten noch mit `woyCode` und `mdsPackage` und müssen auf `$mdsRepos` und die Repo-Tabelle umgestellt werden.
+- Repo `MdsTools` auf GitHub ist noch leer: Erster Push von `Repos/Mds` steht aus (`git push -u origin main`).
 - Die Kurzbefehle `2Net`, `2Maui` … und der Alias `zip` des alten Profils entfallen (`go` bzw. `Save-Develop`).
 - Präfix für neue Cmdlets festlegen (z. B. `Mds`) – betrifft nur neue Funktionen, nicht die übernommenen.
 - Logging: Format und Aufbewahrungsdauer der Dateien in `$mdsLogs`.

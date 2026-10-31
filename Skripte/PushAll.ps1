@@ -3,41 +3,54 @@
     Committet alle lokalen Änderungen und pusht sie ins GitHub-Repository (Windows/MARS und macOS/LUNA).
 
 .DESCRIPTION
-    Für jedes Repository:
+    Für jedes Git-Repository unter ~/Dev/Repos:
       1. git add -A und commit (nur wenn es Änderungen gibt)
       2. git fetch und prüfen, ob der Server neuere Commits hat
          -> ja: kein Push, Hinweis auf CloneAll.ps1 (pull)
          -> nein: git push, falls lokale Commits vorhanden sind
-    Root ist der Ordner, in dem das Skript liegt (bzw. woyCode, wenn es in mdsPackage/MacUtils liegt).
+    Root ist der Ordner, in dem das Skript liegt (~/Dev); $env:DEV_ROOT übersteuert.
 
 .PARAMETER Repos
-    Liste der Repositories. Standard: mdsPackage, NetCoreLib2026, NetMauiApps, PythonHB
+    Kurznamen (Ordner unter Repos). Standard: alle Git-Repositories unter Repos.
 
 .PARAMETER Message
     Commit-Nachricht. Standard: "Update <Datum Uhrzeit> von <Rechner>"
 
 .EXAMPLE
     ./PushAll.ps1
-    ./PushAll.ps1 -Message "Neue Logging-Klasse"
+    ./PushAll.ps1 -Repos Net, Maui -Message "Neue Logging-Klasse"
 
 .NOTES
     Version  Datum       Wer           Was
     1.0.0    2026-10-29  Claude/Hubi   Erste Version, Windows + macOS
+    2.0.0    2026-10-31  Hubi/Claude   Kurznamen, Standard = alle Repos unter ~/Dev/Repos
 #>
 [CmdletBinding()]
 param(
-    [string[]]$Repos = @('mdsPackage', 'NetCoreLib2026', 'NetMauiApps', 'PythonHB'),
+    [string[]]$Repos = @(),
     [string]$Message
 )
 
-$ScriptVersion = '1.0.0'
+$ScriptVersion = '2.0.0'
 
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
 $hostName  = [System.Net.Dns]::GetHostName()
 
+# --- Root bestimmen: Ordner des Skripts (~/Dev). Laeuft es direkt aus dem Repo
+#     (Repos/Mds/Skripte), drei Ebenen nach oben. $env:DEV_ROOT uebersteuert. ---
 $Root = $PSScriptRoot
-if ((Split-Path $Root -Leaf) -eq 'MacUtils') { $Root = Split-Path (Split-Path $Root -Parent) -Parent }
+if ((Split-Path $Root -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $Root -Parent) -Parent) -Leaf) -eq 'Repos') {
+    $Root = Split-Path (Split-Path (Split-Path $Root -Parent) -Parent) -Parent
+}
+if ($env:DEV_ROOT) { $Root = $env:DEV_ROOT }
+$ReposDir = Join-Path $Root 'Repos'
+
+if ($Repos.Count -eq 0) {
+    $Repos = Get-ChildItem -Path $ReposDir -Directory |
+        Where-Object { Test-Path (Join-Path $_.FullName '.git') } |
+        Select-Object -ExpandProperty Name
+}
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Error 'git wurde nicht gefunden. Bitte zuerst Git installieren.'
@@ -45,11 +58,11 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 if (-not $Message) { $Message = "Update $(Get-Date -Format 'yyyy-MM-dd HH:mm') von $hostName" }
 
-Write-Host "PushAll $ScriptVersion auf $hostName ($osName) - Root: $Root" -ForegroundColor Cyan
+Write-Host "PushAll $ScriptVersion auf $hostName ($osName) - Repos: $ReposDir" -ForegroundColor Cyan
 Write-Host "Commit-Nachricht: $Message"
 
 $result = foreach ($repo in $Repos) {
-    $target = Join-Path $Root $repo
+    $target = Join-Path $ReposDir $repo
     Write-Host "`n=== $repo" -ForegroundColor Yellow
 
     if (-not (Test-Path (Join-Path $target '.git'))) {
@@ -68,6 +81,12 @@ $result = foreach ($repo in $Repos) {
 
     # 2. Abgleich mit Server
     git -C $target fetch --quiet
+    $upstream = git -C $target rev-parse --abbrev-ref '@{u}' 2>$null
+    if (-not $upstream) {
+        Write-Warning "$repo`: kein Upstream-Branch - kein Push. Einmalig: git -C $target push -u origin <Branch>"
+        [pscustomobject]@{ Repo = $repo; Commit = $commit; Push = 'Kein Upstream' }
+        continue
+    }
     $behind = [int](git -C $target rev-list --count 'HEAD..@{u}' 2>$null)
     $ahead  = [int](git -C $target rev-list --count '@{u}..HEAD' 2>$null)
 
