@@ -6,6 +6,7 @@
 #
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Neu fuer MdsTools (ersetzt Set-Global/woy-Variablen)
+#   2026-11-01  Hubi/Claude  DEV_HOME statt DEV_ROOT fuer ~/Dev; DEV_<Ordner> lenkt jeden Ordner um
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -17,16 +18,23 @@ try {
 }
 catch { }
 
-# Globale Variablen (MdsTools.md, Abschnitt Globale Variablen). $env:DEV_ROOT uebersteuert $mdsDev.
+# Globale Variablen (MdsTools.md, Abschnitt Globale Variablen).
+# Regel: $env:DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_HOME = ~/Dev, DEV_ROOT = ~/Dev/Root).
+# Gleiche Logik wie die C#-Klasse xBase.BaseRoot in NetCoreLib2026.
+function Get-DevOrdner([string]$Name, [string]$Basis) {
+    $wert = [Environment]::GetEnvironmentVariable("DEV_$($Name.ToUpperInvariant())")
+    if ($wert) { $wert } else { Join-Path $Basis $Name }
+}
 $global:mdsVersion = [version](Import-PowerShellDataFile -LiteralPath (Join-Path $PSScriptRoot '../MdsTools.psd1')).ModuleVersion
-$global:mdsDev = if ($env:DEV_ROOT) { $env:DEV_ROOT } else { Join-Path $HOME 'Dev' }
-$global:mdsRepos = Join-Path $mdsDev 'Repos'
-$global:mdsRoot = Join-Path $mdsDev 'Root'
-$global:mdsBin = Join-Path $mdsRoot 'Bin'
-$global:mdsConfig = Join-Path $mdsRoot 'Config'
-$global:mdsData = Join-Path $mdsRoot 'Data'
-$global:mdsLogs = Join-Path $mdsRoot 'Logs'
-$global:mdsTemp = Join-Path $mdsRoot 'Temp'
+$global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path $HOME 'Dev' }
+$global:mdsRepos = Get-DevOrdner 'Repos' $mdsDev
+$global:mdsRoot = Get-DevOrdner 'Root' $mdsDev
+$global:mdsBin = Get-DevOrdner 'Bin' $mdsRoot
+$global:mdsConfig = Get-DevOrdner 'Config' $mdsRoot
+$global:mdsData = Get-DevOrdner 'Data' $mdsRoot
+$global:mdsLogs = Get-DevOrdner 'Logs' $mdsRoot
+$global:mdsTemp = Get-DevOrdner 'Temp' $mdsRoot
+Remove-Item Function:Get-DevOrdner
 
 foreach ($ordner in $mdsRepos, $mdsBin, $mdsConfig, $mdsData, $mdsLogs, $mdsTemp) {
     if (-not (Test-Path -LiteralPath $ordner -PathType Container)) {

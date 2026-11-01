@@ -15,6 +15,7 @@
 | 2026-10-31 | 0.6     | Hubert Bieder/Claude | Schritt 5: Install.ps1 und Profil auf MdsTools umgestellt, UpdatePS.ps1 entfernt          |
 | 2026-10-31 | 0.5     | Hubert Bieder/Claude | Umsetzung Schritte 1, 2 und 4; SkriptModule als *.ps1; Backup-Develop gefunden            |
 | 2026-10-31 | 0.4     | Hubert Bieder/Claude | E3 und E9 entschieden                                                                     |
+| 2026-11-01 | 0.12    | Hubert Bieder/Claude | `DEV_HOME` statt `DEV_ROOT` für `~/Dev`; jeder Ordner über `DEV_<NAME>` umlenkbar          |
 
 ---
 
@@ -148,8 +149,21 @@ global machen.
 | `$mdsLogs`    | `$mdsRoot/Logs`             | Protokolle                               |
 | `$mdsTemp`    | `$mdsRoot/Temp`             | Zwischendateien, Freigabe-Mounts (macOS) |
 
-Alle Werte werden aus `$HOME` abgeleitet und lassen sich über `$env:DEV_ROOT` übersteuern. Es gibt keine fest
-eingetragenen Pfade.
+Alle Werte werden aus `$HOME` abgeleitet. Es gibt keine fest eingetragenen Pfade.
+
+Jeder Ordner lässt sich über eine Umgebungsvariable umlenken. **Regel: `DEV_<NAME>` zeigt genau auf den Ordner
+`<Name>`.** Untergeordnete Ordner folgen mit (`DEV_ROOT` verschiebt auch `Bin`, `Config` …, sofern diese nicht
+selbst gesetzt sind).
+
+| Umgebungsvariable | Ordner        | Variable               |
+| ----------------- | ------------- | ---------------------- |
+| `DEV_HOME`        | `~/Dev`       | `$mdsDev`              |
+| `DEV_REPOS`       | `Repos`       | `$mdsRepos`            |
+| `DEV_ROOT`        | `Root`        | `$mdsRoot`             |
+| `DEV_BIN` …       | `Root/<Name>` | `$mdsBin` … `$mdsTemp` |
+
+> Bis 01.11.2026 stand `DEV_ROOT` für `~/Dev` (heute `DEV_HOME`). Die C#-Klasse `xBase.BaseRoot` in
+> NetCoreLib2026 verwendet dieselbe Regel.
 
 ## Befehle
 

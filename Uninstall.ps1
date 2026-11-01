@@ -26,19 +26,20 @@
 .NOTES
     Version  Datum       Wer           Was
     1.0.0    2026-10-31  Hubi/Claude   Erste Version (MdsTools.md, Schritt 6)
+    1.0.1    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [switch] $KeepMdsTools
 )
 
-$ScriptVersion = '1.0.0'
+$ScriptVersion = '1.0.1'
 
 # Gemeinsame Pfad-Helfer: Get-UserHome, Get-ProfileRoot, Get-CurrentUserModuleDir
 . (Join-Path $PSScriptRoot 'InstallHelper.ps1')
 
 $moduleNames = if ($KeepMdsTools) { @('mdsPackage') } else { @('mdsPackage', 'MdsTools') }
-$devDir = if ($env:DEV_ROOT) { $env:DEV_ROOT } else { Join-Path (Get-UserHome) 'Dev' }
+$devDir = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path (Get-UserHome) 'Dev' }
 $backupDir = Join-Path $devDir "Archiv/Uninstall-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 
 # Verschiebt eine Datei in den Sicherungsordner (statt sie zu loeschen).

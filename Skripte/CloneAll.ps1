@@ -7,7 +7,7 @@
       - nicht vorhanden          -> git clone nach Repos/<Kurzname>
       - vorhanden, sauber        -> git pull --ff-only
       - vorhanden, mit lokalen Änderungen -> Warnung, wird übersprungen (nichts wird gelöscht)
-    Root ist der Ordner, in dem das Skript liegt (~/Dev); $env:DEV_ROOT übersteuert.
+    Dev ist der Ordner, in dem das Skript liegt (~/Dev); $env:DEV_HOME bzw. $env:DEV_REPOS übersteuern.
 
 .PARAMETER Repos
     Kurznamen oder GitHub-Namen. Standard: alle aus der Repo-Tabelle (Mds, Net, Maui, PHB).
@@ -24,13 +24,14 @@
                                        neue Repo-Liste, Root aus Skriptpfad
     2.1.0    2026-10-29  Claude/Hubi   GitHub-User HubertBieder fest in der URL, Prüfung Credential-Helper
     3.0.0    2026-10-31  Hubi/Claude   Repo-Tabelle mit Kurznamen, Ziel ~/Dev/Repos, MdsTools statt mdsPackage
+    3.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, DEV_REPOS
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.0.0'
+$ScriptVersion = '3.1.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -47,14 +48,14 @@ $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
 $hostName  = [System.Net.Dns]::GetHostName()
 
-# --- Root bestimmen: Ordner des Skripts (~/Dev). Laeuft es direkt aus dem Repo
-#     (Repos/Mds/Skripte), drei Ebenen nach oben. $env:DEV_ROOT uebersteuert. ---
-$Root = $PSScriptRoot
-if ((Split-Path $Root -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $Root -Parent) -Parent) -Leaf) -eq 'Repos') {
-    $Root = Split-Path (Split-Path (Split-Path $Root -Parent) -Parent) -Parent
+# --- Dev bestimmen: Ordner des Skripts (~/Dev). Laeuft es direkt aus dem Repo
+#     (Repos/Mds/Skripte), drei Ebenen nach oben. $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
+$DevDir = $PSScriptRoot
+if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Leaf) -eq 'Repos') {
+    $DevDir = Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Parent
 }
-if ($env:DEV_ROOT) { $Root = $env:DEV_ROOT }
-$ReposDir = Join-Path $Root 'Repos'
+if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
+$ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }
 
 # --- Auswahl: Kurz- oder GitHub-Namen auf Tabelleneinträge abbilden ---
 $auswahl = [ordered]@{}

@@ -4,19 +4,24 @@
     Pester-Tests fuer MdsTools (MdsTools.md, Schritt 8).
 
 .DESCRIPTION
-    Laedt das Modul aus dem Repo (nicht die installierte Kopie) mit $env:DEV_ROOT im
+    Laedt das Modul aus dem Repo (nicht die installierte Kopie) mit $env:DEV_HOME im
     Pester-TestDrive, damit weder ~/Dev noch der echte PATH veraendert werden.
     Aufruf: Invoke-Pester ./tests
 
 .NOTES
     Version  Datum       Wer           Was
     1.0.0    2026-10-31  Hubi/Claude   Erste Version
+    1.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, Umlenkung DEV_REPOS/DEV_ROOT/DEV_CONFIG
 #>
 
 BeforeAll {
-    $script:alterDevRoot = $env:DEV_ROOT
+    $script:alteEnv = @{}
+    foreach ($n in 'HOME', 'REPOS', 'ROOT', 'BIN', 'CONFIG', 'DATA', 'LOGS', 'TEMP') {
+        $script:alteEnv[$n] = [Environment]::GetEnvironmentVariable("DEV_$n")
+        [Environment]::SetEnvironmentVariable("DEV_$n", $null)
+    }
     $script:alterPath = $env:PATH
-    $env:DEV_ROOT = Join-Path $TestDrive 'Dev'
+    $env:DEV_HOME = Join-Path $TestDrive 'Dev'
     $script:manifest = Join-Path $PSScriptRoot '../Modul/MdsTools/MdsTools.psd1'
     Remove-Module MdsTools -ErrorAction SilentlyContinue
     Import-Module $script:manifest -Force
@@ -25,7 +30,9 @@ BeforeAll {
 
 AfterAll {
     Remove-Module MdsTools -ErrorAction SilentlyContinue
-    $env:DEV_ROOT = $script:alterDevRoot
+    foreach ($n in $script:alteEnv.Keys) {
+        [Environment]::SetEnvironmentVariable("DEV_$n", $script:alteEnv[$n])
+    }
     $env:PATH = $script:alterPath
 }
 
@@ -52,8 +59,8 @@ Describe 'Modul' {
 }
 
 Describe 'Globale Variablen und Root-Ordner' {
-    It 'leitet alle Pfade aus DEV_ROOT ab' {
-        $mdsDev | Should -Be $env:DEV_ROOT
+    It 'leitet alle Pfade aus DEV_HOME ab' {
+        $mdsDev | Should -Be $env:DEV_HOME
         $mdsRepos | Should -Be (Join-Path $mdsDev 'Repos')
         $mdsRoot | Should -Be (Join-Path $mdsDev 'Root')
         $mdsBin | Should -Be (Join-Path $mdsRoot 'Bin')
@@ -62,6 +69,24 @@ Describe 'Globale Variablen und Root-Ordner' {
 
     It 'legt die Root-Unterordner an' -ForEach @('Bin', 'Config', 'Data', 'Logs', 'Temp') {
         Join-Path $mdsRoot $_ | Should -Exist
+    }
+
+    It 'lenkt Repos, Root und Config ueber DEV_REPOS, DEV_ROOT, DEV_CONFIG um' {
+        $env:DEV_REPOS = Join-Path $TestDrive 'AndereRepos'
+        $env:DEV_ROOT = Join-Path $TestDrive 'Laufzeit'
+        $env:DEV_CONFIG = Join-Path $TestDrive 'Konfig'
+        try {
+            Import-Module $script:manifest -Force
+            $mdsDev | Should -Be $env:DEV_HOME
+            $mdsRepos | Should -Be $env:DEV_REPOS
+            $mdsRoot | Should -Be $env:DEV_ROOT
+            $mdsBin | Should -Be (Join-Path $env:DEV_ROOT 'Bin')
+            $mdsConfig | Should -Be $env:DEV_CONFIG
+        }
+        finally {
+            $env:DEV_REPOS = $null; $env:DEV_ROOT = $null; $env:DEV_CONFIG = $null
+            Import-Module $script:manifest -Force
+        }
     }
 
     It 'nimmt $mdsBin genau einmal in den PATH auf' {
