@@ -408,7 +408,9 @@ function Clear-BinFolder {
             # Immer zu behaltende Funktions-/Asset-Ordner. Zusaetzlich bleiben alle *.app-Pakete
             # (macOS/MAUI), sonst loescht ein Build in einen gemeinsamen Ordner die anderen Apps.
             # 2026-10-31 Hubi/Claude: *.app ergaenzt
-            $keepFolders = @('runtimes', 'images', 'wwwRoot', 'Microsoft.UI.Xaml', 'NpuDetect')
+            # 2026-11-02 Hubi/Claude: PlugIns ergaenzt - der TaskScheduler (Bin/Task) traegt seine Tasks in
+            #                         PlugIns/<Name>; ein Neubau des Schedulers darf sie nicht loeschen
+            $keepFolders = @('runtimes', 'images', 'wwwRoot', 'Microsoft.UI.Xaml', 'NpuDetect', 'PlugIns')
             # WinUI 3 (MAUI-Windows) laedt beim Start die nativen .mui-Ressourcen
             # passend zur UI-Sprache des Rechners. Fehlt der Ordner der aktuellen
             # UI-Kultur (z. B. de-DE) bzw. der englische Fallback, bricht die App
