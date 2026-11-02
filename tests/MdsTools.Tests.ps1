@@ -13,6 +13,7 @@
     1.0.0    2026-10-31  Hubi/Claude   Erste Version
     1.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, Umlenkung DEV_REPOS/DEV_ROOT/DEV_CONFIG
     1.2.0    2026-11-02  Hubi/Claude   Invoke-Make: Gruppen, Init.ps1/Post.ps1, Logdatei; Schutz vor echtem mdsRepos
+    1.2.1    2026-11-02  Hubi/Claude   Invoke-Make: Init.ps1/Post.ps1 nicht bei einzelnem Programm
 #>
 
 BeforeAll {
@@ -392,9 +393,18 @@ Describe 'Invoke-Make' {
         Get-Content $script:hookProtokoll | Should -Be @('I::AB:Eins,Zwei,NurWin,NurMac', 'P:True')
     }
 
+    It 'ruft Init.ps1 und Post.ps1 nicht bei einem einzelnen Programm auf' {
+        Set-Content (Join-Path $script:scripts 'Init.ps1') "'I' | Add-Content '$($script:hookProtokoll)'"
+        Set-Content (Join-Path $script:scripts 'Post.ps1') "'P' | Add-Content '$($script:hookProtokoll)'"
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Should -BeTrue
+        Test-Path $script:hookProtokoll | Should -BeFalse
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm '+b' 6>$null | Should -BeTrue
+        Get-Content $script:hookProtokoll | Should -Be @('I', 'P')
+    }
+
     It 'bricht ab, wenn Init.ps1 fehlschlaegt' {
         Set-Content (Join-Path $script:scripts 'Init.ps1') "throw 'kaputt'"
-        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Should -BeFalse
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm '+b' 6>$null | Should -BeFalse
         Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 0 -Exactly
     }
 

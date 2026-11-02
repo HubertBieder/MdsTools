@@ -18,6 +18,7 @@
 | 2026-11-01 | 0.12    | Hubert Bieder/Claude | `DEV_HOME` statt `DEV_ROOT` für `~/Dev`; jeder Ordner über `DEV_<NAME>` umlenkbar          |
 | 2026-11-01 | 0.13    | Hubert Bieder/Claude | mk: Repo des aktuellen Ordners; macOS-MAUI als .app, `-Package` für .pkg                  |
 | 2026-11-02 | 0.14    | Hubert Bieder/Claude | Invoke-Make: Gruppen (`mk +dI`), `Init.ps1`/`Post.ps1`, Logdatei; Schlüssel `Project`     |
+| 2026-11-02 | 0.15    | Hubert Bieder/Claude | Invoke-Make: `Init.ps1`/`Post.ps1` nicht bei einzeln angegebenem Programm                 |
 
 ---
 
@@ -254,6 +255,8 @@ Schlüssel je Programm: `Project` (Pflicht; der frühere Name `Projekt` wird wei
 
 Liegt `scripts/Init.ps1` bzw. `scripts/Post.ps1` im Repo, ruft `Invoke-Make` sie vor bzw. nach dem Bauen auf. Die
 Ausgabe meldet jeweils „wird ausgeführt“ oder „nicht vorhanden – wird nicht ausgeführt“.
+Das gilt nur, wenn alle Programme (ohne Argument) oder Gruppen (`+<Buchstaben>`) gebaut werden. Bei einem einzeln
+angegebenen Programm (`mk maui Invoice`) laufen weder `Init.ps1` noch `Post.ps1`.
 
 | Parameter    | Inhalt                                                                  |
 | ------------ | ----------------------------------------------------------------------- |

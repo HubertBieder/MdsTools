@@ -6,6 +6,7 @@
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
 #   2026-11-02  Hubi/Claude  Invoke-Make: Gruppen, Init.ps1/Post.ps1, Logdatei
+#   2026-11-02  Hubi/Claude  Invoke-Make: Init.ps1/Post.ps1 nicht bei einzelnem Programm
 #
 # Oeffentlich: Publish-DotNet, Build-Project, Clear-BinFolder, Invoke-Make
 #======================================================================
@@ -857,12 +858,14 @@ function Invoke-MakeHook([string] $Datei, [hashtable] $Argumente) {
 # Ablauf: scripts/Init.ps1 -> Programme bauen -> scripts/Post.ps1 (beide optional). Sie erhalten
 #   -Auswahl <Programm-Argument> -Gruppen <Buchstaben der gewaehlten Programme> -Programme <Namen>,
 #   Post.ps1 zusaetzlich -Erfolg <$true/$false>. Ein Fehler in Init.ps1 bricht vor dem Bauen ab.
+#   Nur bei allen Programmen oder +<Gruppen>, nicht bei einem einzeln angegebenen Programm.
 # Log: <RepoRoot>/.Log/yyyy-MM-dd_HHmmss_MakeOK.log bzw. ..._MakeErr.log (Mitschnitt per Start-Transcript),
 #   im selben Ordner wie die LOG-<Projekt>.ps1 von Publish-DotNet.
 # Ausgabeordner: -OutDir, sonst OutDir der Tabelle, sonst $mdsBin/<Kurzname>/<Projekt> (E10).
 # Rueckgabewert: $true, wenn alle ausgewaehlten Programme (und Init/Post) erfolgreich waren.
 # 2026-10-31 Hubi/Claude: erstellt (MdsTools.md, Schritt 7)
 # 2026-11-02 Hubi/Claude: Gruppen (+<Buchstaben>), Init.ps1/Post.ps1, Logdatei, Schluessel Project
+# 2026-11-02 Hubi/Claude: Init.ps1/Post.ps1 nicht bei einzelnem Programm
 function Invoke-Make {
     [CmdletBinding()]
     param
@@ -925,6 +928,7 @@ function Invoke-Make {
         Programme = $namen
     }
     $scripts = Join-Path $RepoRoot 'scripts'
+    $mitHooks = -not $Programm -or $Programm.StartsWith('+')
 
     $logOrdner = Join-Path $RepoRoot '.Log'
     New-Item -ItemType Directory -Path $logOrdner -Force | Out-Null
@@ -937,7 +941,10 @@ function Invoke-Make {
     [int] $uebersprungen = 0
     Push-Location -LiteralPath $RepoRoot
     try {
-        $initOk = Invoke-MakeHook (Join-Path $scripts 'Init.ps1') $hookArgs
+        if (-not $mitHooks) {
+            Write-Info "Einzelnes Programm - Init.ps1 und Post.ps1 werden nicht ausgeführt"
+        }
+        $initOk = -not $mitHooks -or (Invoke-MakeHook (Join-Path $scripts 'Init.ps1') $hookArgs)
         if (-not $initOk) {
             $fehler++
             $namen = @()
@@ -960,7 +967,7 @@ function Invoke-Make {
                 $fehler++
             }
         }
-        if ($initOk) {
+        if ($mitHooks -and $initOk) {
             if (-not (Invoke-MakeHook (Join-Path $scripts 'Post.ps1') ($hookArgs + @{ Erfolg = ($fehler -eq 0) }))) {
                 $fehler++
             }
