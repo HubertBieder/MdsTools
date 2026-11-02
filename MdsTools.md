@@ -375,7 +375,7 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6, 8 und 9 erledigt, Schritt 7 zur Hälft
      Die Deploy-Skripte (`Make-TaskAPI`, `Make-RestSRV`, `Make-AufAPI`, `Make-My*`, `Make-TaskScheduler`,
      `Make-Rebuild`) gehen **nicht** in `Make.ps1` auf: Sie stoppen/starten Dienste und IIS und werden aus
      Programmen aufgerufen (`TaskAdminConfig.RebuildScript`, `GlobalConfig.cs`). Sie werden nur auf
-     MdsTools und die neuen Pfade umgestellt.
+     MdsTools und die neuen Pfade umgestellt. In Net liegen die Windows-Skripte unter `scripts/Windows`.
    Die alten Skripte rufen noch `Publish-NET` und `Build-Projects` auf und laufen mit MdsTools nicht mehr.
 8. Pester-Tests für `go`, Pfadauflösung und Export-Liste schreiben.
    Erledigt: `tests/MdsTools.Tests.ps1` (Aufruf `Invoke-Pester ./tests`), läuft im Pester-TestDrive.
