@@ -16,6 +16,8 @@
 | 2026-10-31 | 0.5     | Hubert Bieder/Claude | Umsetzung Schritte 1, 2 und 4; SkriptModule als *.ps1; Backup-Develop gefunden            |
 | 2026-10-31 | 0.4     | Hubert Bieder/Claude | E3 und E9 entschieden                                                                     |
 | 2026-11-01 | 0.12    | Hubert Bieder/Claude | `DEV_HOME` statt `DEV_ROOT` für `~/Dev`; jeder Ordner über `DEV_<NAME>` umlenkbar          |
+| 2026-11-01 | 0.13    | Hubert Bieder/Claude | mk: Repo des aktuellen Ordners; macOS-MAUI als .app, `-Package` für .pkg                  |
+| 2026-11-02 | 0.14    | Hubert Bieder/Claude | Invoke-Make: Gruppen (`mk +dI`), `Init.ps1`/`Post.ps1`, Logdatei; Schlüssel `Project`     |
 
 ---
 
@@ -187,18 +189,31 @@ Arguments spielt keine Rolle.
 
 Jedes C#-Repo hat ein Verzeichnis `scripts/` mit **genau einem** Einstieg `Make.ps1`.
 
-| Aufruf                                | Wirkung                               |
-| ------------------------------------- | ------------------------------------- |
-| `mk`                                  | Repos mit `scripts/Make.ps1` anzeigen |
-| `mk <Repo>`                           | alle Programme des Repos bauen        |
-| `mk <Repo> <Programm>`                | nur dieses Programm bauen             |
-| `mk <Repo> -List`                     | bekannte Programme des Repos anzeigen |
-| `mk <Repo> <Programm> -OutDir <Pfad>` | Ausgabeordner für diesen Lauf         |
+| Aufruf im Repo-Ordner (oder darunter) | Wirkung                                    |
+| ------------------------------------- | ------------------------------------------ |
+| `mk`                                  | alle Programme dieses Repos bauen          |
+| `mk <Programm>`                       | nur dieses Programm bauen                  |
+| `mk +<Gruppen>`                       | alle Programme dieser Gruppen bauen        |
+
+| Aufruf von überall                    | Wirkung                                    |
+| ------------------------------------- | ------------------------------------------ |
+| `mk`                                  | außerhalb der Repos: Repos mit `scripts/Make.ps1` anzeigen |
+| `mk <Repo>`                           | alle Programme des Repos bauen             |
+| `mk <Repo> <Programm>`                | nur dieses Programm bauen                  |
+| `mk <Repo> +<Gruppen>`                | alle Programme dieser Gruppen, z. B. `mk maui +dI` |
+| `mk <Repo> -List`                     | bekannte Programme des Repos anzeigen      |
+| `mk <Repo> <Programm> -OutDir <Pfad>` | Ausgabeordner für diesen Lauf              |
+| `mk <Repo> <Programm> -Package`       | macOS-MAUI: Installationspaket statt .app  |
 
 - `mk` ist eine Modulfunktion und funktioniert von jedem Ordner aus. Sie ruft `$mdsRepos/<Repo>/scripts/Make.ps1` auf.
+- Steht man in einem Repo-Ordner, gilt dieses Repo; der erste Parameter ist dann das Programm (außer er ist selbst ein Repo-Name).
+- macOS-MAUI (Mac Catalyst): Standard ist die direkt startbare `<Programm>.app` im Ausgabeordner (ersetzt die vorhandene,
+  Start per Doppelklick oder `open`). Mit `-Package` entsteht stattdessen `<Programm>-<Version>.pkg` zum Weitergeben
+  (installiert nach `/Applications`). `Clear-BinFolder` fasst Dateien in `*.app` nicht an (Signatur).
 - `<Repo>` ist der Kurzname wie bei `go` (Groß-/Kleinschreibung egal, Tab-Vervollständigung).
 - `Make.ps1` enthält oben eine Tabelle mit den Programmen des Repos (siehe Beispiel unten).
 - Konfiguration: `$mdsConfig/<Programm>/`.
+- Musterimplementierung mit allen Funktionen: `Maui/scripts/Make.ps1` (mit `Init.ps1` und `Post.ps1`).
 - Nach dem Build werden aus dem Ausgabeordner entfernt: `*.pdb`, XML-Dokumentation, fremde Runtimes
   (`runtimes/*` außer der Ziel-RID) und Satellitensprachen außer `de`/`en`.
   Die genaue Liste steht zentral in `Clear-BinFolder`.
@@ -215,13 +230,54 @@ Ein relativer `OutDir` gilt relativ zu `$mdsBin`; ein absoluter Pfad wird unver�
 Ordner, legt `Make.ps1` ihn an.
 
 ```powershell
-# 2026-10-31 Hubi/Claude: Programmtabelle in Maui/scripts/Make.ps1
+# 2026-11-02 Hubi/Claude: Programmtabelle (Auszug aus Maui/scripts/Make.ps1)
+$Gruppen = @{ 'D' = 'Data'; 'I' = 'Invoice'; 'A' = 'Apps' }       # nur fuer die Anzeige
 $Programme = [ordered]@{
-    'MyArtikel' = @{ Projekt = 'src/MyArtikel/MyArtikel.csproj'; OutDir = 'Desktop' }  # -> $mdsBin/Desktop
-    'MyRepApp'  = @{ Projekt = 'src/MyRepApp/MyRepApp.csproj';   OutDir = 'Desktop' }
-    'TaskSched' = @{ Projekt = 'src/TaskSched/TaskSched.csproj' }                       # -> $mdsBin/Maui/TaskSched
+    'AdminMAUI' = @{ Project = 'src/Desktop/AdminMAUI/AdminMAUI.csproj'; Group = 'D'; OutDir = 'Desktop' }  # -> $mdsBin/Desktop
+    'MyInvoice' = @{ Project = 'src/Desktop/MyInvoice/MyInvoice.csproj'; Group = 'I'; OutDir = 'Desktop' }
+    'DataApp'   = @{ Project = 'src/Apps/DataApp/DataApp.csproj'; Group = 'A' }                        # -> $mdsBin/Maui/DataApp
 }
 ```
+
+Schlüssel je Programm: `Project` (Pflicht; der frühere Name `Projekt` wird weiter verstanden), `Group`, `OutDir`,
+`Nur` (`'Windows'`/`'MacOS'`).
+
+#### Gruppen
+
+- `Group` ist genau ein Buchstabe, Groß-/Kleinschreibung egal. Die Gruppe steht in `-List` und in der Ausgabe je Programm.
+- Auswahl mit `+` und einem oder mehreren Buchstaben: `mk maui +dI` baut die Gruppen Data und Invoice.
+- Nicht `@`: PowerShell liest `@dI` als Splatting der Variablen `$dI` und übergibt nichts, `mk` würde dann alles bauen.
+  `#` leitet einen Kommentar ein.
+- Unbekannte Buchstaben brechen mit Fehlermeldung ab, gebaut wird dann nichts.
+
+#### Init.ps1 und Post.ps1
+
+Liegt `scripts/Init.ps1` bzw. `scripts/Post.ps1` im Repo, ruft `Invoke-Make` sie vor bzw. nach dem Bauen auf. Die
+Ausgabe meldet jeweils „wird ausgeführt“ oder „nicht vorhanden – wird nicht ausgeführt“.
+
+| Parameter    | Inhalt                                                                  |
+| ------------ | ----------------------------------------------------------------------- |
+| `-Auswahl`   | Argument des Aufrufs: leer, Programmname oder `+<Gruppen>`              |
+| `-Gruppen`   | Buchstaben (groß) der gewählten Programme; ohne Auswahl alle Gruppen    |
+| `-Programme` | Namen der gewählten Programme                                           |
+| `-Erfolg`    | nur `Post.ps1`: `$true`, wenn alle Programme gebaut wurden               |
+
+Ein Fehler in `Init.ps1` (`throw`, `Write-Error`) bricht vor dem Bauen ab; `Post.ps1` läuft dann nicht.
+
+#### Logdatei
+
+Jeder Lauf (außer `-List`) wird per `Start-Transcript` in `<Repo>/.Log/` mitgeschrieben:
+`yyyy-MM-dd_HHmmss_MakeOK.log` ohne Fehler, `yyyy-MM-dd_HHmmss_MakeErr.log` mit Fehler.
+
+`.Log/` ist der eine Log-Ordner je Repo:
+
+| Datei                            | Erzeugt von      | Inhalt                                          |
+| -------------------------------- | ---------------- | ----------------------------------------------- |
+| `yyyy-MM-dd_HHmmss_MakeOK.log`   | `Invoke-Make`    | gesamte Ausgabe eines `mk`-Laufs ohne Fehler    |
+| `yyyy-MM-dd_HHmmss_MakeErr.log`  | `Invoke-Make`    | dasselbe mit Fehler                             |
+| `LOG-<Projekt>.ps1`              | `Publish-DotNet` | letzter `dotnet`-Aufruf des Projekts (zum Nachstarten) |
+
+Der Punkt verbirgt den Ordner im Finder (anzeigen mit ⇧⌘.), VS Code zeigt ihn. `.gitignore` enthält `**/.Log/`.
 
 Wenn mehrere Programme in denselben Ordner geschrieben werden (z. B. alle Desktop-Programme nach
 `$mdsBin/Desktop`), gilt:
@@ -339,8 +395,6 @@ Stand 2026-10-31: Schritte 1, 2, 4, 5, 6, 8 und 9 erledigt, Schritt 7 zur Hälft
 ## Offene Punkte
 
 - `NewToolMDS.md` anlegen oder Verweis entfernen.
-- Architektur der Mac-Builds: `Publish-DotNet` baut fest für `osx-x64` bzw. `maccatalyst-x64`, LUNA ist ein Apple-Silicon-Mac (arm64).
-- MAUI-Workloads auf LUNA fehlen (`dotnet workload restore` in `Repos/Maui`), `mk` in `Maui` baut daher auf dem Mac noch nicht.
 - Repo `MdsTools` auf GitHub ist noch leer: Erster Push von `Repos/Mds` steht aus (`git push -u origin main`).
 - Die Kurzbefehle `2Net`, `2Maui` … und der Alias `zip` des alten Profils entfallen (`go` bzw. `Save-Develop`).
 - Präfix für neue Cmdlets festlegen (z. B. `Mds`) – betrifft nur neue Funktionen, nicht die übernommenen.

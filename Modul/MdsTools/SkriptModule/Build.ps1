@@ -5,6 +5,7 @@
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
+#   2026-11-02  Hubi/Claude  Invoke-Make: Gruppen, Init.ps1/Post.ps1, Logdatei
 #
 # Oeffentlich: Publish-DotNet, Build-Project, Clear-BinFolder, Invoke-Make
 #======================================================================
@@ -390,8 +391,10 @@ function Clear-BinFolder {
                 $pattern = "$pattern,*.pdb"
             }
             $patterns = $pattern.Split(',')
+            # Dateien in *.app-Paketen (macOS) nie anfassen: jede Aenderung bricht die Signatur.
+            # 2026-11-01 Hubi/Claude
             Get-ChildItem -Path (Join-Path -Path $Folder -ChildPath '*') -Recurse -File -Force -ErrorAction SilentlyContinue |
-            Where-Object { Test-InPattern $_.Name $patterns } |
+            Where-Object { $_.FullName -notmatch '\.app[\\/]' -and (Test-InPattern $_.Name $patterns) } |
             ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
             [int] $nachher = $vorher - (Get-ChildItem -LiteralPath $Folder -File -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($nachher -gt 0) {
@@ -438,9 +441,37 @@ function Clear-BinFolder {
     }
 }
 
+# [intern] Kopiert die fertige <App>.app aus bin/<Config>/<Framework>/<RID> des Projekts in den
+# Zielordner (vorhandene .app wird ersetzt). ditto erhaelt Bundle-Struktur, Symlinks und Signatur.
+# Rueckgabewert: Pfad der kopierten .app, leer bei Fehler.
+# 2026-11-01 Hubi/Claude: erstellt
+function Copy-AppBundle([string] $CsProj, [string] $Config, [string] $Frame, [string] $Rid, [string] $TargetDir) {
+    $binDir = Join-Path (Split-Path -Path $CsProj -Parent) "bin/$Config/$Frame/$Rid"
+    $app = Get-ChildItem -LiteralPath $binDir -Directory -Filter '*.app' -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($null -eq $app) {
+        Write-Fail "Keine .app in $binDir gefunden"
+        return ""
+    }
+    $ziel = Join-Path $TargetDir $app.Name
+    if (Test-Path -LiteralPath $ziel) {
+        Remove-Item -LiteralPath $ziel -Recurse -Force
+    }
+    & ditto $app.FullName $ziel
+    if ($LastExitCode -ne 0) {
+        Write-Fail "Kopieren von $($app.Name) nach $TargetDir fehlgeschlagen"
+        return ""
+    }
+    Write-Info "App:           $ziel"
+    return $ziel
+}
+
 # [public] Publish-DotNet — Veroeffentlicht ein .NET-Projekt per 'dotnet publish' (RID je OS/Prozessor, framework-
 # abhaengig ermittelt) ins Zielverzeichnis; behandelt MAUI-/Windows-Besonderheiten und kann
 # optional zippen/starten.
+# macOS-MAUI (Mac Catalyst): Standard ist die direkt startbare <App>.app im Zielordner (ersetzt die
+# vorhandene), mit -Package das Installationspaket <App>-<Version>.pkg zum Weitergeben.
+# 2026-11-01 Hubi/Claude: .app statt .pkg als Standard, Schalter -Package
 function Publish-DotNet {
     [CmdletBinding()]
     param
@@ -475,7 +506,12 @@ function Publish-DotNet {
 
         [Parameter(Mandatory = $False, HelpMessage = "Will be used a Build")]
         [ValidateNotNullOrEmpty()]
-        [switch]$Build = $false
+        [switch]$Build = $false,
+
+        # macOS-MAUI: Standard ist die direkt startbare .app im Zielordner; mit -Package
+        # das Installationspaket (.pkg) zum Weitergeben.
+        [Parameter(Mandatory = $False, HelpMessage = "macOS-MAUI: Installationspaket (.pkg) statt .app")]
+        [switch]$Package = $false
     )
     process {
         $csProj = Find-CsProj -Proj $Path
@@ -578,6 +614,9 @@ function Publish-DotNet {
                 # Wird beim MAUI-Windows-Ziel gesetzt: Restore vorab OHNE RID, dann
                 # Compilieren mit --no-restore (siehe Begruendung im Windows-Zweig).
                 $separateRestore = $false
+                # Mac Catalyst ohne -Package: .app nach dem Publish in den Zielordner kopieren.
+                $copyApp = $false
+                $appPath = ""
                 # HINWEIS: Frueher wurde hier -p:NoWarn="CS86xx;$(NoWarn)" uebergeben.
                 # Das funktioniert nicht wie gedacht: Kommandozeilen-Properties
                 # ERSETZEN die Projektwerte ($(NoWarn) wird nicht expandiert),
@@ -621,6 +660,12 @@ function Publish-DotNet {
                         # und hier mit --no-restore compilieren.
                         $separateRestore = $true
                         $arguments = @($doIT, $csProj, "-c", $config, $tl, "-f", $frame, "--no-restore", "-o:$TargetDir")
+                    }
+                    elseif ($frame.ToLowerInvariant().Contains("-maccatalyst") -and -not $Package -and -not $Build) {
+                        # Ohne Paket: die .app entsteht im bin-Ordner des Projekts und wird nach dem
+                        # Publish kopiert. Mit -o legt dotnet sie unter dem vollen Quellpfad ab.
+                        $copyApp = $true
+                        $arguments = @($doIT, $csProj, "-c", $config, $tl, "-f", $frame, "-r", $rtm, "-p:CreatePackage=false")
                     }
                     else {
                         $arguments = @($doIT, $csProj, "-c", $config, $tl, "-f", $frame, "-r", $rtm, "-o:$TargetDir")
@@ -687,6 +732,12 @@ function Publish-DotNet {
                     return $false
                 }
                 Write-Success "[$fileName] has been $doIT successfully"
+                if ($copyApp) {
+                    $appPath = Copy-AppBundle -CsProj $csProj -Config $config -Frame $frame -Rid $rtm -TargetDir $TargetDir
+                    if ($appPath.Length -eq 0) {
+                        return $false
+                    }
+                }
                 # Nach Abschluss des Compilierens das Zielverzeichnis von nicht
                 # benoetigten Dateien bereinigen (Clear-BinFolder).
                 # Bei einer API wird immer bereinigt, sonst steuerbar ueber -Clear/-Zip/-Run.
@@ -697,7 +748,13 @@ function Publish-DotNet {
                     New-ZipArchiv -Folder $targetDir | Out-Null
                 }
                 if ($Run -and !$isLib) {
-                    Start-Exe $targetDir $fileName
+                    if ($appPath.Length -gt 0) {
+                        Write-Info "Starten von :  $appPath"
+                        & open $appPath
+                    }
+                    else {
+                        Start-Exe $targetDir $fileName
+                    }
                 }
                 return $true
             }
@@ -756,18 +813,56 @@ function Build-Project {
     return ($fehler -eq 0)
 }
 
+# [intern] Text einer Gruppe fuer die Anzeige: Buchstabe (gross) und, falls bekannt, ihr Name.
+function Get-MakeGroupText([string] $Group, [System.Collections.IDictionary] $Gruppen) {
+    if (-not $Group) { return "" }
+    $g = $Group.ToUpperInvariant()
+    $name = if ($Gruppen) { $Gruppen.Keys | Where-Object { $_ -eq $g } | ForEach-Object { $Gruppen[$_] } | Select-Object -First 1 }
+    if ($name) { "$g $name" } else { $g }
+}
+
+# [intern] Ruft ein optionales Skript (Init.ps1/Post.ps1) mit den Argumenten auf, falls es existiert.
+# Jeder Fehler im Skript gilt als Abbruch. Rueckgabewert: $false bei Fehler, sonst $true.
+function Invoke-MakeHook([string] $Datei, [hashtable] $Argumente) {
+    $name = Split-Path $Datei -Leaf
+    if (-not (Test-Path -LiteralPath $Datei -PathType Leaf)) {
+        Write-Info "$name nicht vorhanden - wird nicht ausgeführt"
+        return $true
+    }
+    Write-Info "$name wird ausgeführt"
+    try {
+        $ErrorActionPreference = 'Stop'
+        & $Datei @Argumente | Out-Host
+        return $true
+    }
+    catch {
+        Write-Fail "${name}: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 # [public] Invoke-Make — Baut Programme eines Repos nach einer Programmtabelle. Wird von
 # <Repo>/scripts/Make.ps1 aufgerufen (und damit von mk).
-#   Programme  [ordered] Name -> @{ Projekt = <csproj relativ zu RepoRoot>
+#   Programme  [ordered] Name -> @{ Project = <csproj relativ zu RepoRoot> (frueher Projekt, wird weiter verstanden)
+#                                   Group   = <optional: ein Buchstabe, Gross-/Kleinschreibung egal>
 #                                   OutDir  = <optional: relativ zu $mdsBin oder absolut>
 #                                   Nur     = <optional: 'Windows' oder 'MacOS'> }
+#   Gruppen    optional: Buchstabe -> Name der Gruppe (nur fuer die Anzeige)
 #   RepoRoot   Wurzel des Repos (Standard: aktueller Ordner)
-#   Programm   nur dieses Programm (Name aus der Tabelle, Gross-/Kleinschreibung egal)
+#   Programm   leer: alle Programme; +<Buchstaben>: alle Programme dieser Gruppen (z. B. +dI);
+#              sonst nur dieses Programm (Name aus der Tabelle, Gross-/Kleinschreibung egal)
 #   OutDir     Ausgabeordner fuer diesen Lauf, uebersteuert die Tabelle
 #   List       Tabelle anzeigen statt bauen
+#   Package    macOS-MAUI: Installationspaket (.pkg) statt direkt startbarer .app
+# Ablauf: scripts/Init.ps1 -> Programme bauen -> scripts/Post.ps1 (beide optional). Sie erhalten
+#   -Auswahl <Programm-Argument> -Gruppen <Buchstaben der gewaehlten Programme> -Programme <Namen>,
+#   Post.ps1 zusaetzlich -Erfolg <$true/$false>. Ein Fehler in Init.ps1 bricht vor dem Bauen ab.
+# Log: <RepoRoot>/.Log/yyyy-MM-dd_HHmmss_MakeOK.log bzw. ..._MakeErr.log (Mitschnitt per Start-Transcript),
+#   im selben Ordner wie die LOG-<Projekt>.ps1 von Publish-DotNet.
 # Ausgabeordner: -OutDir, sonst OutDir der Tabelle, sonst $mdsBin/<Kurzname>/<Projekt> (E10).
-# Rueckgabewert: $true, wenn alle ausgewaehlten Programme erfolgreich gebaut wurden.
+# Rueckgabewert: $true, wenn alle ausgewaehlten Programme (und Init/Post) erfolgreich waren.
 # 2026-10-31 Hubi/Claude: erstellt (MdsTools.md, Schritt 7)
+# 2026-11-02 Hubi/Claude: Gruppen (+<Buchstaben>), Init.ps1/Post.ps1, Logdatei, Schluessel Project
 function Invoke-Make {
     [CmdletBinding()]
     param
@@ -778,39 +873,75 @@ function Invoke-Make {
         [Parameter(Mandatory = $false, HelpMessage = "Wurzel des Repos")]
         [string] $RepoRoot = (Get-Location).Path,
 
-        [Parameter(Mandatory = $false, HelpMessage = "Nur dieses Programm")]
+        [Parameter(Mandatory = $false, HelpMessage = "Programm oder +<Gruppen>")]
         [string] $Programm = "",
 
         [Parameter(Mandatory = $false, HelpMessage = "Ausgabeordner fuer diesen Lauf")]
         [string] $OutDir = "",
 
         [Parameter(Mandatory = $false, HelpMessage = "Programmtabelle anzeigen")]
-        [switch] $List
+        [switch] $List,
+
+        [Parameter(Mandatory = $false, HelpMessage = "macOS-MAUI: Installationspaket (.pkg) statt .app")]
+        [switch] $Package,
+
+        [Parameter(Mandatory = $false, HelpMessage = "Namen der Gruppen (Buchstabe -> Name)")]
+        [System.Collections.IDictionary] $Gruppen = @{}
     )
     $repo = Get-RepoShortName $RepoRoot
+    $projektVon = { param($p) if ($p.Project) { $p.Project } else { $p.Projekt } }
+    $gruppeVon = { param($name) "$($Programme[$name].Group)".ToUpperInvariant() }
     if ($List) {
         $Programme.Keys | ForEach-Object {
             $p = $Programme[$_]
-            $ziel = if ($p.OutDir) { $p.OutDir } else { "$repo/$([System.IO.Path]::GetFileNameWithoutExtension($p.Projekt))" }
-            [pscustomobject]@{ Programm = $_; Ausgabe = $ziel; Nur = $p.Nur; Projekt = $p.Projekt }
+            $projekt = & $projektVon $p
+            $ziel = if ($p.OutDir) { $p.OutDir } else { "$repo/$([System.IO.Path]::GetFileNameWithoutExtension($projekt))" }
+            [pscustomobject]@{ Programm = $_; Gruppe = Get-MakeGroupText $p.Group $Gruppen; Ausgabe = $ziel; Nur = $p.Nur; Projekt = $projekt }
         } | Format-Table -AutoSize | Out-Host
         return $true
     }
 
     $namen = @($Programme.Keys)
-    if ($Programm) {
+    if ($Programm.StartsWith('+')) {
+        $wahl = @($Programm.Substring(1).ToUpperInvariant().ToCharArray() | ForEach-Object { [string]$_ } | Select-Object -Unique)
+        $bekannt = @($Programme.Keys | ForEach-Object { & $gruppeVon $_ } | Where-Object { $_ } | Select-Object -Unique)
+        $unbekannt = @($wahl | Where-Object { $_ -notin $bekannt })
+        if ($wahl.Count -eq 0 -or $unbekannt.Count -gt 0) {
+            Write-Fail "Unbekannte Gruppe '$($unbekannt -join '')' in '$Programm'. Bekannt: $($bekannt -join ', ')"
+            return $false
+        }
+        $namen = @($Programme.Keys | Where-Object { (& $gruppeVon $_) -in $wahl })
+    }
+    elseif ($Programm) {
         $namen = @($Programme.Keys | Where-Object { $_ -eq $Programm })
         if ($namen.Count -eq 0) {
             Write-Fail "Unbekanntes Programm '$Programm'. Bekannt: $($Programme.Keys -join ', ')"
             return $false
         }
     }
+    $hookArgs = @{
+        Auswahl   = $Programm
+        Gruppen   = @($namen | ForEach-Object { & $gruppeVon $_ } | Where-Object { $_ } | Select-Object -Unique)
+        Programme = $namen
+    }
+    $scripts = Join-Path $RepoRoot 'scripts'
+
+    $logOrdner = Join-Path $RepoRoot '.Log'
+    New-Item -ItemType Directory -Path $logOrdner -Force | Out-Null
+    $stempel = Get-Date -Format 'yyyy-MM-dd_HHmmss'
+    $logLauf = Join-Path $logOrdner "${stempel}_Make.log"
+    Start-Transcript -LiteralPath $logLauf -UseMinimalHeader | Out-Null
 
     [int] $erfolg = 0
     [int] $fehler = 0
     [int] $uebersprungen = 0
     Push-Location -LiteralPath $RepoRoot
     try {
+        $initOk = Invoke-MakeHook (Join-Path $scripts 'Init.ps1') $hookArgs
+        if (-not $initOk) {
+            $fehler++
+            $namen = @()
+        }
         foreach ($name in $namen) {
             $p = $Programme[$name]
             if (($p.Nur -eq 'Windows' -and -not $IsWindows) -or ($p.Nur -eq 'MacOS' -and -not $IsMacOS)) {
@@ -818,21 +949,34 @@ function Invoke-Make {
                 $uebersprungen++
                 continue
             }
+            $gruppe = Get-MakeGroupText $p.Group $Gruppen
+            Write-Start ($gruppe ? "$name  [$gruppe]" : $name)
             $ziel = if ($OutDir) { $OutDir } elseif ($p.OutDir) { $p.OutDir } else { "" }
-            $projekt = Join-Path $RepoRoot $p.Projekt
-            if (Publish-DotNet -Path $projekt -TargetDir $ziel -Clear -Verbose:($VerbosePreference -eq 'Continue')) {
+            $projekt = Join-Path $RepoRoot (& $projektVon $p)
+            if (Publish-DotNet -Path $projekt -TargetDir $ziel -Clear -Package:$Package -Verbose:($VerbosePreference -eq 'Continue')) {
                 $erfolg++
             }
             else {
                 $fehler++
             }
         }
+        if ($initOk) {
+            if (-not (Invoke-MakeHook (Join-Path $scripts 'Post.ps1') ($hookArgs + @{ Erfolg = ($fehler -eq 0) }))) {
+                $fehler++
+            }
+        }
+        $farbe = if ($fehler -eq 0) { 'Green' } else { 'Red' }
+        Write-Host "Fertig: $erfolg erfolgreich, $fehler fehlgeschlagen, $uebersprungen übersprungen" -ForegroundColor $farbe
     }
     finally {
         Pop-Location
+        Stop-Transcript | Out-Null
+        $art = $fehler -eq 0 ? 'MakeOK' : 'MakeErr'
+        $log = Join-Path $logOrdner "${stempel}_$art.log"
+        # Zwei Laeufe in derselben Sekunde: kein Log ueberschreiben
+        for ($n = 2; Test-Path -LiteralPath $log; $n++) { $log = Join-Path $logOrdner "${stempel}_${art}_$n.log" }
+        Move-Item -LiteralPath $logLauf -Destination $log
     }
-
-    $farbe = if ($fehler -eq 0) { 'Green' } else { 'Red' }
-    Write-Host "Fertig: $erfolg erfolgreich, $fehler fehlgeschlagen, $uebersprungen übersprungen" -ForegroundColor $farbe
+    Write-Info "Log: $log"
     return ($fehler -eq 0)
 }

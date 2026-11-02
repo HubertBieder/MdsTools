@@ -12,6 +12,7 @@
     Version  Datum       Wer           Was
     1.0.0    2026-10-31  Hubi/Claude   Erste Version
     1.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, Umlenkung DEV_REPOS/DEV_ROOT/DEV_CONFIG
+    1.2.0    2026-11-02  Hubi/Claude   Invoke-Make: Gruppen, Init.ps1/Post.ps1, Logdatei; Schutz vor echtem mdsRepos
 #>
 
 BeforeAll {
@@ -25,6 +26,8 @@ BeforeAll {
     $script:manifest = Join-Path $PSScriptRoot '../Modul/MdsTools/MdsTools.psd1'
     Remove-Module MdsTools -ErrorAction SilentlyContinue
     Import-Module $script:manifest -Force
+    # Schutz: Die Tests schreiben scripts/Make.ps1 in $mdsRepos und duerfen nie die echten Repos treffen
+    if (-not $mdsRepos.StartsWith($TestDrive.ToString())) { throw "mdsRepos zeigt nicht in den TestDrive: $mdsRepos" }
     New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'Net/src') -Force | Out-Null
 }
 
@@ -128,9 +131,10 @@ Describe 'mk' {
         $scripts = Join-Path $mdsRepos 'Net/scripts'
         New-Item -ItemType Directory -Path $scripts -Force | Out-Null
         Set-Content -Path (Join-Path $scripts 'Make.ps1') -Value @"
-param([string] `$Programm = '', [string] `$OutDir = '', [switch] `$List)
-"P=`$Programm|O=`$OutDir|L=`$List" | Set-Content '$($script:protokoll)'
+param([string] `$Programm = '', [string] `$OutDir = '', [switch] `$List, [switch] `$Package)
+"P=`$Programm|O=`$OutDir|L=`$List|K=`$Package" | Set-Content '$($script:protokoll)'
 "@
+        New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'Net/src/Tief') -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'OhneMake') -Force | Out-Null
     }
     BeforeEach { Remove-Item $script:protokoll -ErrorAction SilentlyContinue }
@@ -138,23 +142,54 @@ param([string] `$Programm = '', [string] `$OutDir = '', [switch] `$List)
     It 'ruft scripts/Make.ps1 des Repos auf (Gross-/Kleinschreibung egal), auch von ausserhalb' {
         Push-Location $TestDrive
         try { mk NET } finally { Pop-Location }
-        Get-Content $script:protokoll | Should -Be 'P=|O=|L=False'
+        Get-Content $script:protokoll | Should -Be 'P=|O=|L=False|K=False'
     }
 
     It 'reicht Programm, -OutDir und -List durch' {
         mk net DKB.CLI -OutDir Test -List
-        Get-Content $script:protokoll | Should -Be 'P=DKB.CLI|O=Test|L=True'
+        Get-Content $script:protokoll | Should -Be 'P=DKB.CLI|O=Test|L=True|K=False'
     }
 
-    It 'zeigt ohne Repo nur die Repos mit Make.ps1' {
-        $ausgabe = mk 6>&1 | Out-String
+    It 'reicht -Package durch' {
+        mk net DKB.CLI -Package
+        Get-Content $script:protokoll | Should -Be 'P=DKB.CLI|O=|L=False|K=True'
+    }
+
+    It 'nimmt ohne Repo das Repo des aktuellen Ordners (auch aus Unterordnern)' {
+        Push-Location (Join-Path $mdsRepos 'Net/src/Tief')
+        try { mk } finally { Pop-Location }
+        Get-Content $script:protokoll | Should -Be 'P=|O=|L=False|K=False'
+    }
+
+    It 'versteht im Repo-Ordner den ersten Parameter als Programm' {
+        Push-Location (Join-Path $mdsRepos 'Net')
+        try { mk DKB.CLI } finally { Pop-Location }
+        Get-Content $script:protokoll | Should -Be 'P=DKB.CLI|O=|L=False|K=False'
+    }
+
+    It 'zeigt ohne Repo ausserhalb der Repos nur die Repos mit Make.ps1' {
+        Push-Location $TestDrive
+        try { $ausgabe = mk 6>&1 | Out-String } finally { Pop-Location }
         $ausgabe | Should -Match 'Net'
         $ausgabe | Should -Not -Match 'OhneMake'
         $script:protokoll | Should -Not -Exist
     }
 
+    It 'meldet -Buchstaben mit Hinweis auf + und baut nichts' {
+        $ausgabe = mk net -di 6>&1 | Out-String
+        $ausgabe | Should -Match 'mk \+di'
+        $script:protokoll | Should -Not -Exist
+    }
+
+    It 'reicht +Gruppen als Programm durch' {
+        Push-Location (Join-Path $mdsRepos 'Net')
+        try { mk +dI } finally { Pop-Location }
+        Get-Content $script:protokoll | Should -Be 'P=+dI|O=|L=False|K=False'
+    }
+
     It 'meldet ein Repo ohne Make.ps1' {
-        $ausgabe = mk OhneMake 6>&1 | Out-String
+        Push-Location $TestDrive
+        try { $ausgabe = mk OhneMake 6>&1 | Out-String } finally { Pop-Location }
         $ausgabe | Should -Match 'Kein Repo'
         $script:protokoll | Should -Not -Exist
     }
@@ -233,8 +268,11 @@ Describe 'Dateifunktionen' {
         $bin = Join-Path $script:arbeit 'bin'
         New-Item -ItemType Directory -Path (Join-Path $bin 'runtimes'), (Join-Path $bin 'fr'), (Join-Path $bin 'Andere.app/Contents') -Force | Out-Null
         'x' | Set-Content (Join-Path $bin 'app.dll'), (Join-Path $bin 'app.pdb'), (Join-Path $bin 'app.xml')
+        'x' | Set-Content (Join-Path $bin 'Andere.app/Contents/Info.xml'), (Join-Path $bin 'Andere.app/Contents/app.pdb')
         Clear-BinFolder $bin 6>$null | Out-Null
         (Get-ChildItem $bin).Name | Sort-Object | Should -Be @('Andere.app', 'app.dll', 'runtimes')
+        # Inhalt der .app bleibt unangetastet (sonst ist die Signatur ungueltig)
+        (Get-ChildItem (Join-Path $bin 'Andere.app/Contents')).Name | Sort-Object | Should -Be @('app.pdb', 'Info.xml')
     }
 
     It 'Remove-OldFile behaelt die neuesten n Dateien' {
@@ -277,17 +315,22 @@ Describe 'Dateifunktionen' {
 Describe 'Invoke-Make' {
     BeforeAll {
         $script:tabelle = [ordered]@{
-            'Eins'    = @{ Projekt = 'src/Eins/Eins.csproj' }
-            'Zwei'    = @{ Projekt = 'src/Zwei/Zwei.csproj'; OutDir = 'Desktop' }
-            'NurWin'  = @{ Projekt = 'src/W/W.csproj'; Nur = 'Windows' }
-            'NurMac'  = @{ Projekt = 'src/M/M.csproj'; Nur = 'MacOS' }
+            'Eins'    = @{ Projekt = 'src/Eins/Eins.csproj'; Group = 'a' }
+            'Zwei'    = @{ Project = 'src/Zwei/Zwei.csproj'; OutDir = 'Desktop'; Group = 'B' }
+            'NurWin'  = @{ Projekt = 'src/W/W.csproj'; Nur = 'Windows'; Group = 'a' }
+            'NurMac'  = @{ Projekt = 'src/M/M.csproj'; Nur = 'MacOS'; Group = 'a' }
         }
-        $script:repo = Join-Path $mdsRepos 'Net'
+        $script:repo = Join-Path $TestDrive 'MakeRepo'
+        $script:scripts = Join-Path $script:repo 'scripts'
+        $script:log = Join-Path $script:repo '.Log'
+        $script:hookProtokoll = Join-Path $TestDrive 'hook.txt'
+        New-Item -ItemType Directory -Path $script:scripts -Force | Out-Null
     }
 
     BeforeEach {
         Mock -ModuleName MdsTools Publish-DotNet { $true }
         Mock -ModuleName MdsTools Write-Host { }
+        Remove-Item (Join-Path $script:scripts '*.ps1'), $script:log, $script:hookProtokoll -Recurse -ErrorAction SilentlyContinue
     }
 
     It 'baut alle Programme, ueberspringt fremde Betriebssysteme' {
@@ -307,6 +350,13 @@ Describe 'Invoke-Make' {
         Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { $TargetDir -eq 'Test' }
     }
 
+    It '-Package wird an Publish-DotNet weitergegeben (Standard: ohne)' {
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Out-Null
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { -not $Package }
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' -Package 6>$null | Out-Null
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { $Package }
+    }
+
     It 'meldet ein unbekanntes Programm mit $false' {
         Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Drei' 6>$null | Should -BeFalse
         Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 0 -Exactly
@@ -320,5 +370,40 @@ Describe 'Invoke-Make' {
     It '-List baut nichts' {
         Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -List 6>$null | Out-Null
         Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 0 -Exactly
+    }
+
+    It '+Gruppen baut alle Programme der Gruppen (Gross-/Kleinschreibung egal)' {
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm '+b' 6>$null | Should -BeTrue
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { $Path -like '*Zwei.csproj' }
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm '+Ab' 6>$null | Should -BeTrue
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 2 -Exactly -ParameterFilter { $Path -like '*Zwei.csproj' }
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { $Path -like '*Eins.csproj' }
+    }
+
+    It 'meldet eine unbekannte Gruppe mit $false' {
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm '+bx' 6>$null | Should -BeFalse
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 0 -Exactly
+    }
+
+    It 'ruft Init.ps1 und Post.ps1 mit Auswahl, Gruppen und Ergebnis auf' {
+        Set-Content (Join-Path $script:scripts 'Init.ps1') "param(`$Auswahl, `$Gruppen, `$Programme) `"I:`${Auswahl}:`$(`$Gruppen -join ''):`$(`$Programme -join ',')`" | Add-Content '$($script:hookProtokoll)'"
+        Set-Content (Join-Path $script:scripts 'Post.ps1') "param(`$Auswahl, `$Gruppen, `$Programme, `$Erfolg) `"P:`$Erfolg`" | Add-Content '$($script:hookProtokoll)'"
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo 6>$null | Should -BeTrue
+        Get-Content $script:hookProtokoll | Should -Be @('I::AB:Eins,Zwei,NurWin,NurMac', 'P:True')
+    }
+
+    It 'bricht ab, wenn Init.ps1 fehlschlaegt' {
+        Set-Content (Join-Path $script:scripts 'Init.ps1') "throw 'kaputt'"
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Should -BeFalse
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 0 -Exactly
+    }
+
+    It 'schreibt die Logdatei MakeOK bzw. MakeErr' {
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Out-Null
+        (Get-ChildItem $script:log).Name | Should -Match '^\d{4}-\d{2}-\d{2}_\d{6}_MakeOK\.log$'
+        Remove-Item $script:log -Recurse
+        Mock -ModuleName MdsTools Publish-DotNet { $false }
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Out-Null
+        (Get-ChildItem $script:log).Name | Should -Match '_MakeErr\.log$'
     }
 }
