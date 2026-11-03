@@ -10,6 +10,7 @@
 | 2026-11-01 | 0.2     | Hubert Bieder/Claude | `DEV_<NAME>` lenkt genau den Ordner `<Name>` um (`DEV_HOME` = `~/Dev`)                                |
 | 2026-11-03 | 1.0     | Hubert Bieder/Claude | Neu gegliedert: nur Systematik; Windows flach unter `C:\woyCode`; `$mdsWoy`; Umsetzung in MdsTools.md |
 | 2026-11-03 | 1.1     | Hubert Bieder/Claude | Windows: Root auf `D:\Dev\Root`, ohne Laufwerk D: auf `C:\Dev\Root`                                 |
+| 2026-11-03 | 1.2     | Hubert Bieder/Claude | Ausnahme Auftragsabwicklung (Legacy-Pfade), Repo `Auf`, Init/Post nur bei vollem Lauf, Doku in `Net/docs` |
 
 ## Inhalt und Abgrenzung
 
@@ -98,6 +99,19 @@ Folgen der flachen Struktur:
 - Wer alle Repos braucht, darf nicht einfach alle Unterordner von `$mdsRepos` nehmen, sondern muss Repos erkennen
   (z. B. an `.git` oder an `scripts/Make.ps1`).
 
+#### Ausnahme: Auftragsabwicklung (Legacy-Pfade)
+
+Die Auftragsabwicklung (Repo `Auf`) folgt der Trennung Repos/Root **nicht**. Ihre Pfade sind historisch gewachsen,
+es gibt keinen weiteren Rechner damit; sie sind deshalb fest und absolut eingetragen und nur unter Windows gesetzt:
+
+| Variable     | Pfad                 | Bedeutung                                                         |
+| ------------ | -------------------- | ----------------------------------------------------------------- |
+| `$mdsWoySrc` | `C:\woyCode\Auf`     | Quellen                                                           |
+| `$mdsWoyBin` | `C:\woyCode\Auf\Bin` | Ergebnis des Übersetzens (`mk auf`) – im Repo-Ordner, nicht in Git |
+| `$mdsWoyRun` | `D:\woySystems\Bin`  | installierte Programme; `D:\woySystems\InstallDir` ist das Ziel des Kopierens |
+
+`mk auf` baut daher nach `$mdsWoyBin` und **nicht** nach `$mdsBin`. Alle anderen Repos nutzen `$mdsBin`.
+
 ### Gegenüberstellung
 
 | Bereich              | macOS (LUNA)        | Windows (MARS)      |
@@ -107,6 +121,7 @@ Folgen der flachen Struktur:
 | Root                 | `~/Dev/Root`        | `D:\Dev\Root` (ohne D: `C:\Dev\Root`) |
 | Bin … Temp           | `~/Dev/Root/<Name>` | `<Root>\<Name>`     |
 | Basis abgeleitet aus | `$HOME`             | fest eingetragen    |
+| Auftragsabwicklung   | –                   | `C:\woyCode\Auf\Bin`, `D:\woySystems` (Legacy, siehe oben) |
 
 ### Trennung ist Pflicht
 
@@ -133,8 +148,9 @@ gilt der Standard aus der Tabelle oben.
 | `Net`             | NetCoreLib2026             | C#-Basisklassen, Services, CLIs                |
 | `Maui`            | NetMauiApps                | .NET-MAUI-Apps für alle Systeme                |
 | `PHB`             | PythonHB                   | Python                                         |
+| `Auf`             | woyV26                     | Auftragsabwicklung (nur Windows)               |
 
-Unter Windows liegen unter `C:\woyCode` zusätzlich die bestehenden woy-Repos.
+Unter Windows liegen unter `C:\woyCode` zusätzlich weitere woy-Repos.
 
 **Konvention:** Der Kurzname ist gleichzeitig
 
@@ -191,6 +207,24 @@ $Repos = [ordered]@{
 
 Das Präfix `_` markiert ein Skript als Werkzeug für `run`. Details in [MdsTools.md](MdsTools.md#befehle).
 
+- `Init.ps1`/`Post.ps1` erhalten die Auswahl (`-Auswahl`, `-Gruppen`, `-Programme`) und entscheiden selbst, was sie
+  tun. Arbeiten, die nur beim **vollständigen** Bau Sinn ergeben (Ordner leeren, packen, committen), prüfen
+  `if ($Auswahl) { return }` – so in `Auf`.
+- Ordner im Bin-Ziel, die das Bereinigen nach dem Bauen überleben müssen (z. B. `Template`, `Bilder`, `Log`), stehen
+  in der Programmtabelle von `Make.ps1` unter `Keep`.
+- Pfade zu anderen Repos werden absolut über `$mdsRepos` gebildet (z. B. `C:\woyCode\Net`), nicht über alte
+  Repo-Namen wie `NetCoreLib`.
+
+### Repo-übergreifende Dokumentation
+
+Themen, die **Net, Maui und Auf gemeinsam** betreffen, werden an einer Stelle beschrieben: in
+**`Net/docs/`**. Die Repos verweisen von ihren Dateien (z. B. `Directory.Packages.props`) dorthin, statt das Thema je
+Repo zu wiederholen.
+
+| Datei                       | Inhalt                                                     | Prüfen           |
+| --------------------------- | ---------------------------------------------------------- | ---------------- |
+| `Net/docs/NuGet-Sicherheit.md` | NuGet-Sicherheitslücken, Pins je Repo, Vorgehen          | `run net nuget`  |
+
 ### Versionierung im Code
 
 Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03 Hubi/Claude: …`.
@@ -232,4 +266,8 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
 
 - C#: Der Konstruktor von `xBase.BaseRoot` muss ohne Eingabe die Standards für Windows (`C:\woyCode`, flach) bzw.
   macOS (`~/Dev`, Hierarchie) setzen; wird ein Pfad übergeben, werden die Ordner daraus abgeleitet.
-- Altes Repo mdsPackage entfernen, sobald MdsTools auf LUNA und MARS läuft.
+- Altes Repo mdsPackage entfernen, sobald MdsTools auf LUNA und MARS läuft. Stand 03.11.2026: auf MARS nicht mehr
+  installiert (Reste unter `C:\woyCode\_Alt\mdsPackage`); LUNA steht noch aus.
+- Programmcode in `Auf` setzt noch `Import-Module mdsPackage` voraus (AdminControl `PSDesktopLink.cs` und
+  `DesktopIcons.json`, woyControlCenter `UpdateServer.KorrigierePowerShellLinks`, `xBase/PROCESS.cs`) – Umstellung
+  offen, betrifft auch Kundenrechner.

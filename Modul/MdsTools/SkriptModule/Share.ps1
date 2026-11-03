@@ -6,6 +6,7 @@
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (Common.psm1) uebernommen; ohne woy-
 #                            Credential, zusaetzlich macOS und smb://-Pfade (E12)
+#   2026-11-03  Hubi/Claude  "Verbunden mit ..." nur noch mit -Verbose
 #
 # Oeffentlich: Copy-FolderWithCredential, Copy-FileWithCredential
 #======================================================================
@@ -118,7 +119,8 @@ function Open-SharePath([string[]] $Paths, [System.Management.Automation.PSCrede
                 Close-SharePath @($roots.Values)
                 return $null
             }
-            Write-Host "Verbunden mit //$($info.Server)/$($info.Share) als $($Credential.UserName)" -ForegroundColor Green
+            # 2026-11-03 Hubi/Claude: nur mit -Verbose (wie in mdsProfile), sonst stoert es Tabellen-Ausgaben
+            Write-Verbose "Verbunden mit //$($info.Server)/$($info.Share) als $($Credential.UserName)"
             $roots[$info.Key] = $root
         }
         $local += if ($info.Rest) { Join-Path $roots[$info.Key] $info.Rest } else { $roots[$info.Key] }

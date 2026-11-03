@@ -3,12 +3,14 @@
     Committet alle lokalen Änderungen und pusht sie ins GitHub-Repository (Windows/MARS und macOS/LUNA).
 
 .DESCRIPTION
-    Für jedes Git-Repository unter ~/Dev/Repos:
+    Für jedes Git-Repository unter Repos (macOS: ~/Dev/Repos, Windows: C:\woyCode):
       1. git add -A und commit (nur wenn es Änderungen gibt)
       2. git fetch und prüfen, ob der Server neuere Commits hat
          -> ja: kein Push, Hinweis auf CloneAll.ps1 (pull)
          -> nein: git push, falls lokale Commits vorhanden sind
-    Dev ist der Ordner, in dem das Skript liegt (~/Dev); $env:DEV_HOME bzw. $env:DEV_REPOS übersteuern.
+    macOS/Linux: Dev ist der Ordner, in dem das Skript liegt (~/Dev), Repos in Dev/Repos.
+    Windows:     feste Basis C:\woyCode, die Repos liegen direkt darin (wie CloneAll und $mdsRepos).
+    $env:DEV_HOME bzw. $env:DEV_REPOS übersteuern.
 
 .PARAMETER Repos
     Kurznamen (Ordner unter Repos). Standard: alle Git-Repositories unter Repos.
@@ -25,6 +27,8 @@
     1.0.0    2026-10-29  Claude/Hubi   Erste Version, Windows + macOS
     2.0.0    2026-10-31  Hubi/Claude   Kurznamen, Standard = alle Repos unter ~/Dev/Repos
     2.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, DEV_REPOS
+    2.2.0    2026-11-03  Hubi/Claude   Windows: Repos direkt in C:\woyCode statt C:\woyCode\Repos (wie CloneAll 3.2.0);
+                                       Abbruch, wenn der Repos-Ordner fehlt
 #>
 [CmdletBinding()]
 param(
@@ -32,20 +36,34 @@ param(
     [string]$Message
 )
 
-$ScriptVersion = '2.1.0'
+$ScriptVersion = '2.2.0'
 
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
 $hostName  = [System.Net.Dns]::GetHostName()
 
-# --- Dev bestimmen: Ordner des Skripts (~/Dev). Laeuft es direkt aus dem Repo
-#     (Repos/Mds/Skripte), drei Ebenen nach oben. $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
-$DevDir = $PSScriptRoot
-if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Leaf) -eq 'Repos') {
-    $DevDir = Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Parent
+# --- Dev und Repos bestimmen (gleiche Logik wie CloneAll.ps1 und InitModule.ps1 in MdsTools).
+#     Windows: feste Basis C:\woyCode, Repos direkt darin (eine Ebene).
+#     macOS/Linux: Ordner des Skripts (~/Dev); laeuft es direkt aus dem Repo (Repos/Mds/Skripte),
+#     drei Ebenen nach oben; Repos in Dev/Repos.
+#     $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
+if ($onWindows) {
+    $DevDir = if ($env:DEV_HOME) { $env:DEV_HOME } else { 'C:\woyCode' }
+    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $DevDir }
 }
-if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
-$ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }
+else {
+    $DevDir = $PSScriptRoot
+    if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Leaf) -eq 'Repos') {
+        $DevDir = Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Parent
+    }
+    if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
+    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }
+}
+
+if (-not (Test-Path -LiteralPath $ReposDir -PathType Container)) {
+    Write-Error "Repos-Ordner $ReposDir nicht gefunden - nichts zu tun."
+    exit 1
+}
 
 if ($Repos.Count -eq 0) {
     $Repos = Get-ChildItem -Path $ReposDir -Directory |

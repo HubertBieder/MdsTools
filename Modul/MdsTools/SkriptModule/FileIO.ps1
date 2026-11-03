@@ -375,9 +375,12 @@ function Get-OneDriveRoot() {
 
 # [public] Backup-Develop — Sichert ein Git-Arbeitsverzeichnis als datierte ZIP nach $targetDir
 # (Standard: OneDrive-*_Backup, unter Windows sonst <Laufwerk>\_Backup, unter macOS $mdsRoot/Backup). Mit -force wird ein vorhandenes
-# Tagesarchiv ueberschrieben. Rueckgabewert: $true bei erstelltem Backup.
+# Tagesarchiv ueberschrieben, ohne -force bleibt es unveraendert.
+# Rueckgabewert: Pfad der Ziel-ZIP (neu erstellt oder ohne -force bereits vorhanden), $null bei Fehler.
+# 2026-11-03 Hubi/Claude: Rueckgabe Pfad/$null statt $true/$false (8.2)
 function Backup-Develop() {
     [CmdletBinding()]
+    [OutputType([string])]
     param
     (
         [Parameter(Position = 0, Mandatory = $false, HelpMessage = "sourceDir")]
@@ -390,7 +393,7 @@ function Backup-Develop() {
         [switch]$force = $false
     )
     Begin {
-        [bool] $result = $false
+        [string] $result = $null
 
         $folderName = ""
         $archiv = ""
@@ -445,18 +448,26 @@ function Backup-Develop() {
         }
     }
     Process {
-        if (Test-Path -LiteralPath $archiv) {
-            Write-Warning "$Archiv already exist"
+        if ($archiv.Length -eq 0) {
+            # Quelle ist kein Git-Repo - bereits in Begin gemeldet
+        }
+        elseif (Test-Path -LiteralPath $archiv -PathType Leaf) {
+            # Ohne -force: vorhandenes Tagesarchiv gilt als Backup
+            Write-Warning "$archiv already exist"
+            $result = $archiv
         }
         else {
-            if ($sourceDir.Length -gt 0) {
-                Write-Info  "Backup [$sourceDir] ==> $archiv"
-                $dateien = Get-DevelopFiles -SourceDir $sourceDir
-                Copy-FileToZip -Files $dateien -Archiv $archiv -Root $sourceDir
-                $result = $true
+            Write-Info  "Backup [$sourceDir] ==> $archiv"
+            $dateien = Get-DevelopFiles -SourceDir $sourceDir
+            # Rueckgabe von Copy-FileToZip ("Updated ... with n files") nicht in die Pipeline,
+            # sonst liefert Backup-Develop ein Array statt des ZIP-Pfads.
+            $meldung = Copy-FileToZip -Files $dateien -Archiv $archiv -Root $sourceDir
+            if ($meldung) { Write-Verbose "$meldung" }
+            if (Test-Path -LiteralPath $archiv -PathType Leaf) {
+                $result = $archiv
             }
             else {
-                Write-Warning "SourceDir not exist"
+                Write-Fail "Backup $archiv nicht erstellt"
             }
         }
     }

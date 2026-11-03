@@ -26,6 +26,10 @@
 | 2026-11-03 | 0.20    | Hubert Bieder/Claude | `go repos`; CloneAll unter Windows direkt nach `C:\woyCode`                               |
 | 2026-11-03 | 0.21    | Hubert Bieder/Claude | `go`: nur Ordner mit `.git`                                                               |
 | 2026-11-03 | 0.22    | Hubert Bieder/Claude | Windows: `$mdsRoot` = `D:\Dev\Root`, ohne Laufwerk D: `C:\Dev\Root`                      |
+| 2026-11-03 | 0.23    | Hubert Bieder/Claude | 8.2: Schlüssel `Keep` (Invoke-Make/Clear-BinFolder); JSON-Verfahren (`*.mds`) entfällt    |
+| 2026-11-03 | 0.24    | Hubert Bieder/Claude | Windows: `$mdsWoySrc`/`Bin`/`Run`, Show-Mds mit Zeile `System`, MdsSkripte/Auftrag.ps1    |
+| 2026-11-03 | 0.25    | Hubert Bieder/Claude | Auftragsabwicklung: `mk auf` (Init/Post), `run auf copy`, Schlüssel der woy.env           |
+| 2026-11-03 | 0.26    | Hubert Bieder/Claude | `run auf auto/version/backup/desktop`, `run net nuget`; Backup-Develop liefert Pfad/`$null`; „Verbunden mit“ nur mit `-Verbose` |
 
 ---
 
@@ -48,6 +52,8 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 - [MDS-Development.md](MDS-Development.md) – Systematik der Entwicklungsumgebung
 - [MdsTools-Migration.md](MdsTools-Migration.md) – Ablösung von mdsPackage (Motivation, Entscheidungen,
   Umsetzung, Umbenennungen)
+- `C:\woyCode\Net\docs\NuGet-Sicherheit.md` – NuGet-Sicherheitslücken und Pins, zentral für Net, Maui und Auf
+  (Prüfen: `run net nuget`)
 
 ## Begriffe
 
@@ -68,7 +74,7 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 | A3  | `Install.ps1` in der Repo-Root installiert das Modul, das Profil und die globalen Skripte.                                                                  |
 | A4  | `Uninstall.ps1` in der Repo-Root entfernt alte Installationen von mdsPackage und MdsTools.                                                                  |
 | A5  | Übernommene Cmdlets behalten ihren Namen, außer den Einträgen unter [Umbenennungen](MdsTools-Migration.md#umbenennungen).                                   |
-| A6  | Funktionen für woy, Auftragsabwicklung und das JSON-Verfahren kommen als einzelne `*.ps1` nach `MdsSkripte`.                                                |
+| A6  | Funktionen für woy und Auftragsabwicklung kommen als einzelne `*.ps1` nach `MdsSkripte`. Das JSON-Verfahren (`*.mds`) entfällt (8.2).        |
 | A7  | Alle übrigen Funktionen kommen thematisch gruppiert in `*.ps1`-Dateien unter `SkriptModule`; `MdsTools.psm1` lädt sie per Dot-Sourcing in den Modulbereich. |
 | A8  | Nur Funktionen, die von außen gebraucht werden, werden exportiert; alles andere bleibt intern.                                                              |
 | A9  | Jede öffentliche Funktion hat eine Comment-based Help (`.SYNOPSIS`, `.EXAMPLE`).                                                                            |
@@ -148,6 +154,18 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | `$mdsTemp`    | `$mdsRoot/Temp`     | `$mdsRoot\Temp`     | Zwischendateien, Freigabe-Mounts (macOS)     |
 
 ¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\Dev\Root`. Fehlende Ordner legt MdsTools beim Laden an.
+
+Nur unter Windows gibt es zusätzlich die **Legacy-Adressen der Auftragsabwicklung**. Sie sind fest und absolut
+(es gibt keinen weiteren Rechner mit woy), werden nicht umgelenkt und nicht angelegt; unter macOS fehlen sie.
+
+| Variable     | Windows (MARS)       | Bedeutung                                              |
+| ------------ | -------------------- | ------------------------------------------------------ |
+| `$mdsWoySrc` | `C:\woyCode\Auf`     | Quellen der Auftragsabwicklung                         |
+| `$mdsWoyBin` | `C:\woyCode\Auf\Bin` | Binärdaten aus dem Übersetzen (`Auf/scripts/Make.ps1`) |
+| `$mdsWoyRun` | `D:\woySystems\Bin`  | Zielverzeichnis der installierten Programme            |
+
+Die Hilfsfunktionen dazu (`Clear-WoyProcess`, `Write-WoyVersionCS`, `Write-DateiListe`) stehen in
+`MdsSkripte/Auftrag.ps1` und werden von `Auf/scripts/Init.ps1` und `Post.ps1` benutzt.
 
 - `$mdsWoy` ist bewusst ein Integer: Skripte können `if ($mdsWoy -ge 26)` oder `if (-not $mdsWoy)` prüfen.
   Der Wert 26 steht in `InitModule.ps1` als Konstante.
@@ -247,7 +265,11 @@ $Programme = [ordered]@{
 ```
 
 Schlüssel je Programm: `Project` (Pflicht; der frühere Name `Projekt` wird weiter verstanden), `Group`, `OutDir`,
-`Nur` (`'Windows'`/`'MacOS'`).
+`Nur` (`'Windows'`/`'MacOS'`), `Keep` (ab 8.2: Unterordner, die `Clear-BinFolder` nach dem Bauen zusätzlich
+behält, z. B. `@('Template', 'Bilder', 'Log')` in einem gemeinsamen Bin-Ordner).
+
+Baut ein Repo in einen eigenen Bin-Ordner (z. B. `C:\woyCode\Auf\Bin\Net10` statt `$mdsBin`), trägt `Make.ps1`
+den absoluten Pfad als `OutDir` ein (siehe `Auf/scripts/Make.ps1`).
 
 #### Gruppen
 
@@ -316,22 +338,46 @@ erkennbar: `scripts/_<Name>.ps1`. Dateien ohne Präfix (z. B. `Make.ps1`, Hilfss
 - `-List` gehört `run` selbst; ein run-Skript sollte deshalb keinen Parameter `-List` haben.
 - Das Skript läuft im aktuellen Ordner; Pfade im Repo bildet es über `$PSScriptRoot`.
 
+#### Vorhandene run-Skripte
+
+| Repo | Aufruf                       | Skript                 | Zweck                                                                 |
+| ---- | ---------------------------- | ---------------------- | --------------------------------------------------------------------- |
+| Auf  | `run auf auto [-MitDatenbank]` | `scripts/_auto.ps1`  | bauen (`mk auf`), lokal kopieren, woyControlCenter starten            |
+| Auf  | `run auf copy [t\|s]`        | `scripts/_copy.ps1`    | Deck nach InstallDir: lokal, TEST-SRV, SQL-SRV                        |
+| Auf  | `run auf version [-Verbose]` | `scripts/_version.ps1` | Versionen aus `Dateiliste.txt` an allen Stellen                       |
+| Auf  | `run auf backup`             | `scripts/_backup.ps1`  | Repo als `Auf_yyyyMMdd.zip` sichern, Pfad und Größe ausgeben          |
+| Auf  | `run auf desktop`            | `scripts/_desktop.ps1` | alle Desktop-Verknüpfungen der Auftragsabwicklung anlegen             |
+| Net  | `run net nuget [Repo]`       | `scripts/_nuget.ps1`   | Net, Maui, Auf auf NuGet-Sicherheitslücken prüfen                     |
+
+Die Auf-Skripte beschreibt [Auftragsabwicklung](#auftragsabwicklung-nur-windows), `run net nuget` die zentrale
+Übersicht `C:\woyCode\Net\docs\NuGet-Sicherheit.md`.
+
 ### Show-Mds – Variablen anzeigen
 
 `Show-Mds` zeigt eine Kopfzeile (Modulversion, woy-Stand, PowerShell-Version, Betriebssystem) und je Variable eine
 Zeile mit Wert, Quelle und – bei Ordnern – ob der Ordner existiert. Quelle ist `DEV_<NAME>`, wenn eine
-Umgebungsvariable den Ordner umlenkt, sonst `Standard`.
+Umgebungsvariable den Ordner umlenkt, sonst `Standard`. Die erste Zeile `System` zeigt, ob man unter Windows oder
+macOS arbeitet. Nur unter Windows folgen am Ende `mdsWoySrc`, `mdsWoyBin` und `mdsWoyRun` (Quelle `Legacy (fest)`).
 
 ```text
-*----  MdsTools 8.1.0 | woy 0 | PowerShell 7.6.9 | macOS  -------
+*----  MdsTools 8.2.0 | woy 0 | PowerShell 7.6.9 | macOS  -------
 
 Variable   Wert                          Quelle        Vorhanden
 --------   ----                          ------        ---------
-mdsVersion 8.1.0                         MdsTools.psd1
+System     macOS                         IsMacOS
+mdsVersion 8.2.0                         MdsTools.psd1
 mdsWoy     0                             macOS
 mdsDev     /Users/hubert/Dev             Standard      True
 mdsRepos   /Users/hubert/Dev/Repos       Standard      True
 …
+```
+
+Unter Windows zusätzlich:
+
+```text
+mdsWoySrc  C:\woyCode\Auf                Legacy (fest) True
+mdsWoyBin  C:\woyCode\Auf\Bin            Legacy (fest) True
+mdsWoyRun  D:\woySystems\Bin             Legacy (fest) True
 ```
 
 Die Zeilen sind Objekte und lassen sich weiterverarbeiten, z. B. `Show-Mds | Where-Object Vorhanden -eq $false`.
@@ -359,7 +405,7 @@ Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](MdsTools-Mi
 | `Copy-ToZip`, `Copy-FileToZip`, `Export-FromZip`, `Get-ZipEntry` | Zip       | `Zip.ps1`        | ja     | allgemeine Hilfsfunktionen                                                             |
 | `Resolve-MdsPath`                                                | Common    | `Common.ps1`     | nein   | wird durch die globalen Variablen ersetzt                                              |
 | `Get-ProjectReference`, `Get-ExportedMember`                     | Common    | `Common.ps1`     | nein   | kein externer Aufruf gefunden                                                          |
-| `Test-Package`                                                   | Common    | `MdsSkripte`     | –      | gehört zum JSON-Verfahren (E8)                                                         |
+| `Test-Package`                                                   | Common    | **entfällt**     | –      | gehört zum JSON-Verfahren, wird ab 8.2 nicht mehr unterstützt (E8)                     |
 | `Write-Error`                                                    | –         | **entfällt**     | –      | eingebautes Cmdlet, darf nicht überschrieben werden                                    |
 | `Backup-Develop`, `Get-OneDriveRoot`                             | FileIO    | `FileIO.ps1`     | ja     | waren als `global:` definiert; macOS ergänzt (OneDrive unter `~/Library/CloudStorage`) |
 
@@ -378,13 +424,11 @@ Unter Windows kann `MdsSkripte` weiterhin die woy-Anmeldedaten übergeben.
 
 ## Auftragsabwicklung (nur Windows)
 
-> **Stand:** Gerüst. Die Besonderheiten werden auf MARS eingerichtet und getestet und dann hier ergänzt.
-Entwicklungsroot ist C:\woyCode
-Die Run-Root ist D:\woySystems
-> Stellen mit **TODO** sind noch offen.
+> **Stand:** Auf MARS eingerichtet: Bauen mit `mk auf`, Kopieren mit `run auf copy`. Stellen mit **TODO** sind
+> noch offen.
 
-Die Auftragsabwicklung (auf Basis von woy/mdsProfile) läuft nur unter Windows. Unter macOS wird nichts davon
-geladen; `$mdsWoy` ist dort `0`.
+Die Auftragsabwicklung (früher woy/mdsProfile) läuft nur unter Windows. Unter macOS wird nichts davon
+geladen; `$mdsWoy` ist dort `0`. Entwicklungsroot ist `C:\woyCode`, Laufzeit-Root `D:\woySystems`.
 
 ### Voraussetzungen
 
@@ -393,12 +437,40 @@ geladen; `$mdsWoy` ist dort `0`.
 | Betriebssystem | Windows (MARS), `$IsWindows`                                                                           |
 | woy-Stand      | `$mdsWoy` = `26` (Prüfung in Skripten: `if ($mdsWoy -ge 26)`)                                          |
 | Basisordner    | `C:\woyCode` (flach, siehe [MDS-Development.md](MDS-Development.md#windows-mars-flach-unter-cwoycode)) |
+| Legacy-Pfade   | `$mdsWoySrc`, `$mdsWoyBin`, `$mdsWoyRun` (siehe [Globale Variablen](#globale-variablen))               |
 | Anmeldedaten   | `%USERPROFILE%\.woy\woy.env`                                                                           |
-| Server         | TEST-SRV, SQL-SRV – **TODO:** Freigaben/Pfade je Server                                                |
+| Server         | TEST-SRV, SQL-SRV, je Freigabe `\\<Server>\woyAufInstall`                                              |
 
-_Copy2Mars.ps1 | copiert das Installationsverzeichnis zum lokalen Tset
-_Copy2Terra.ps1 | Kopiert vom Entwicklungsrechner  
-_Copy2SQL.ps1 |                                           |
+### Bauen: mk auf
+
+`Auf/scripts/Make.ps1` enthält die Programmtabelle (früher `auftrag.mds`). Jeder Part der `.mds` ist eine Gruppe;
+die Programme landen absolut in `$mdsWoyBin` (`C:\woyCode\Auf\Bin\<Ordner>`), nicht in `$mdsBin`.
+
+| Gruppe        | Programme                                             | Ausgabe ($mdsWoyBin\…)   |
+| ------------- | ----------------------------------------------------- | ------------------------ |
+| R = Release   | Auf2000V26, TapiServer                                | `Net10`                  |
+| A = Admin     | AdminRDM, AdminControl, woyArtImport, Lizenz, Monitor | `Admin`                  |
+| S = ServiceNT | AufServiceNT, woyRest.ServiceHost                     | `ServiceNT`              |
+| C = Control   | woyControlCenter                                      | `UpdateService`          |
+| T = PSwoyTask | cmdAuftrag, cmdPrint                                  | `PowerShell\woyTask\Bin` |
+| P = RepApp    | RepApp, Signatur                                      | `RepApp`                 |
+| U = Update    | UpdateGuid, TestGuid                                  | `Update`                 |
+
+`Keep` schützt die Unterordner `Template`, `Bilder`, `Log` und `Skripte` vor `Clear-BinFolder`.
+
+`Init.ps1` und `Post.ps1` (früher `Auftrag_Pre.ps1`/`Auftrag_Post.ps1`) arbeiten **nur bei `mk auf` ohne
+Auswahl**; bei `mk auf +r` oder einem einzelnen Programm geschieht dort nichts.
+
+| Skript     | Inhalt                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| `Init.ps1` | Prozesse beenden (`Clear-WoyProcess`), `Net10`, `UpdateService`, `ServiceNT`, `Admin` löschen,         |
+|            | `Version.cs` schreiben (`Write-WoyVersionCS`); ein Fehler bricht vor dem Bauen ab                      |
+| `Post.ps1` | nur wenn alle Programme gebaut wurden: Bibliotheken, Schemastände, Bilder, woyTask-Paket kopieren,     |
+|            | ZIPs ins Deck `UpdateService`, AufAPI/MyRepApp/MyArtikel/MyOrderApp aus `C:\woyCode\Net`,              |
+|            | `Dateiliste.txt` (`Write-DateiListe`), `Backup-Develop`, Commit und Push (`git` direkt)                |
+
+Die Hilfsfunktionen `Clear-WoyProcess`, `Write-WoyVersionCS` und `Write-DateiListe` stehen in
+`MdsSkripte/Auftrag.ps1`.
 
 ### Laden
 
@@ -437,22 +509,55 @@ WOY_SERVER_USER=DOMAIN\hubert
 WOY_SERVER_PASS=*
 ```
 
-**TODO:** Liste der auf MARS benötigten Schlüssel (Namen für TEST-SRV, SQL-SRV, lokal).
+Auf MARS benötigte Schlüssel:
+
+| Schlüssel                            | Zweck                                       | Standard ohne Eintrag |
+| ------------------------------------ | ------------------------------------------- | --------------------- |
+| `WOY_SERVER_USER`, `WOY_SERVER_PASS` | Anmeldung an TEST-SRV und SQL-SRV           | –                     |
+| `WOY_TESTSRV`                        | Adresse TEST-SRV (MARS: `192.168.50.28`)    | `TEST-SRV`            |
+| `WOY_SQLSRV`                         | Adresse SQL-SRV (MARS: `192.168.50.17`)     | `SQL-SRV`             |
 
 ### Werkzeuge mit run
 
-Rechner- und serverbezogene Abläufe (Kopieren nach TEST-SRV und SQL-SRV, …) liegen als `scripts/_<Name>.ps1` im
-jeweiligen Repo und werden mit [`run`](#run--repo-skripte-ausführen) gestartet. Muster:
+Rechner- und serverbezogene Abläufe liegen als `scripts/_<Name>.ps1` im jeweiligen Repo und werden mit
+[`run`](#run--repo-skripte-ausführen) gestartet.
 
-```powershell
-# scripts/_Copy.ps1 — 2026-11-03 Hubi/Claude: Muster, auf MARS anzupassen
-param([ValidateSet('TEST-SRV', 'SQL-SRV')] [string] $Ziel = 'TEST-SRV')
-if (-not $IsWindows -or $mdsWoy -lt 26) { Write-Fail "Nur unter Windows mit woy $mdsWoy >= 26"; return }
-$cred = Get-WoyCredential 'server'
-Copy-FolderWithCredential -SourceDir (Join-Path $mdsBin 'Net/TaskAPI') -TargetDir "\\$Ziel\Deploy\TaskAPI" -Recurse -Credential $cred
-```
+#### run auf copy – Installationsverzeichnis verteilen
 
-**TODO:** tatsächliche Skripte, Zielpfade (`\\<Server>\Deploy\…` ist nur ein Platzhalter) und Parameter.
+`Auf/scripts/_copy.ps1` (aus `Publish-Auf2000` in mdsProfile.ps1) kopiert das Deck
+`$mdsWoyBin\UpdateService` (entsteht bei `mk auf`) inkrementell in das `InstallDir` des Ziels. Der erste
+Buchstabe des Ziels reicht.
+
+| Aufruf           | Ziel                                                        |
+| ---------------- | ----------------------------------------------------------- |
+| `run auf copy`   | `D:\woySystems\InstallDir` (lokal auf MARS)                 |
+| `run auf copy t` | `\\TEST-SRV\woyAufInstall\InstallDir`, dazu `Bin\RepApp`    |
+| `run auf copy s` | `\\SQL-SRV\woyAufInstall\InstallDir`                        |
+
+Für Freigaben meldet sich das Skript mit `Get-WoyCredential 'server'` an. Es definiert die globalen Funktionen
+`Publish-Auf2000 [<Ziel>]` und `Get-WoyServerShare <Ziel>`, die danach in der Sitzung aufrufbar bleiben.
+
+**TODO:** Kopieren vom Entwicklungsrechner nach TERRA (früher als `_Copy2Terra.ps1` vorgesehen).
+
+#### run auf auto, version, desktop
+
+| Aufruf                       | Skript         | Inhalt (früher in mdsProfile.ps1 / Make-MDS.ps1)                                        |
+| ---------------------------- | -------------- | --------------------------------------------------------------------------------------- |
+| `run auf auto`               | `_auto.ps1`    | `Make.ps1` (= `mk auf`), bei Erfolg `_copy.ps1` lokal, dann woyControlCenter als Admin  |
+|                              |                | (`KEEPPID=<PID> OhneDBF`, mit `-MitDatenbank` `Installieren`) – ersetzt Make-MDS.ps1     |
+| `run auf version`            | `_version.ps1` | Version aus `Dateiliste.txt`: Deck, lokal (InstallDir, Config), SQL-SRV, TEST-SRV        |
+| `run auf desktop`            | `_desktop.ps1` | alle Desktop-Verknüpfungen: D@, D0–D5 auf die run-Skripte, C, M, T, S, R auf die         |
+|                              |                | Programme in `$mdsWoyBin` (früher Install-DevLink/Install-ProgLink)                     |
+
+`Get-WoyServerShare <t|s>` (UNC-Wurzel `\\<Server>\woyAufInstall`) steht in `MdsSkripte/Auftrag.ps1`.
+
+#### run auf backup – Repo sichern
+
+`Auf/scripts/_backup.ps1` ruft `Backup-Develop -Force -Verbose` für `$mdsWoySrc` auf: ein vorhandenes
+Tagesarchiv `Auf_yyyyMMdd.zip` wird überschrieben, am Ende stehen Pfad und Größe der Ziel-ZIP.
+
+`Backup-Develop` liefert ab 8.2 den **Pfad der Ziel-ZIP** (bisher `$true`/`$false`), bei Fehler `$null`. Ohne
+`-Force` und mit vorhandenem Tagesarchiv bleibt das Archiv unverändert, zurück kommt sein Pfad.
 
 ### Deploy-Skripte
 
@@ -469,8 +574,10 @@ MdsTools und die neuen Pfade umgestellt (siehe [MdsTools-Migration.md](MdsTools-
 - [ ] `%USERPROFILE%\.woy\woy.env` vorhanden und vollständig (`Get-WoyEnvPath`, `Get-WoyValue …`).
 - [ ] `Get-WoyCredential server` liefert eine Anmeldung.
 - [ ] `go`, `mk`, `run` in `C:\woyCode` (flache Struktur) prüfen.
-- [ ] Kopieren nach TEST-SRV mit `run … Copy`.
-- [ ] Kopieren nach SQL-SRV.
+- [x] Bauen mit `mk auf` (Programmtabelle, `-List` geprüft); vollständiger Lauf mit Init/Post noch zu testen.
+- [ ] Kopieren lokal mit `run auf copy`.
+- [ ] Kopieren nach TEST-SRV mit `run auf copy t`.
+- [ ] Kopieren nach SQL-SRV mit `run auf copy s`.
 - [ ] Deploy-Skripte in `Net/scripts/Windows` mit MdsTools.
 - [ ] **TODO:** weitere Besonderheiten.
 

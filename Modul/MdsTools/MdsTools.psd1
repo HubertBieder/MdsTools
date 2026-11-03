@@ -4,12 +4,14 @@
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Erstellt, Version 8.0.0 (E1)
 #   2026-11-03  Hubi/Claude  run und Show-Mds exportiert
+#   2026-11-03  Hubi/Claude  8.2.0: Anpassen an Windows (Keep fuer Clear-BinFolder/Invoke-Make),
+#                            JSON-Verfahren (*.mds) wird nicht mehr unterstuetzt
 #
 @{
     RootModule        = 'MdsTools.psm1'
 
     # Einzige Stelle fuer die Modulversion (A2); $mdsVersion liest sie aus.
-    ModuleVersion     = '8.1.0'
+    ModuleVersion     = '8.2.0'
 
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'

@@ -10,6 +10,7 @@
 #   2026-11-03  Hubi/Claude  Windows: feste Basis C:\woyCode, Repos und Root auf derselben Ebene
 #   2026-11-03  Hubi/Claude  $mdsWoy (Windows 26, sonst 0)
 #   2026-11-03  Hubi/Claude  Windows: Root auf D:\Dev\Root, wenn Laufwerk D: vorhanden, sonst C:\Dev\Root
+#   2026-11-03  Hubi/Claude  Windows: Legacy-Adressen $mdsWoySrc, $mdsWoyBin, $mdsWoyRun
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -33,6 +34,17 @@ $global:mdsVersion = [version](Import-PowerShellDataFile -LiteralPath (Join-Path
 #   Windows (MARS): 26 = aktueller woy-Stand (woyCode); macOS/Linux: 0 = kein woy.
 #   $mdsVersion ist dagegen auf allen Systemen gleich (Manifest).
 $global:mdsWoy = [int]$(if ($IsWindows) { 26 } else { 0 })
+# 2026-11-03 Hubi/Claude: Legacy-Adressen der Auftragsabwicklung, nur Windows (MARS), fest und absolut.
+#   Es gibt keinen weiteren Rechner mit woy; die Pfade werden bewusst nicht abgeleitet oder angelegt.
+#   $mdsWoySrc  Quellen der Auftragsabwicklung (Repo Auf)
+#   $mdsWoyBin  Binaerdaten aus dem Uebersetzen (scripts/Make.ps1)
+#   $mdsWoyRun  Zielverzeichnis der installierten Programme
+#   Unter macOS/Linux gibt es diese Variablen nicht.
+if ($IsWindows) {
+    $global:mdsWoySrc = 'C:\woyCode\Auf'
+    $global:mdsWoyBin = 'C:\woyCode\Auf\Bin'
+    $global:mdsWoyRun = 'D:\woySystems\Bin'
+}
 # 2026-11-03 Hubi/Claude: Windows und macOS unterscheiden (wie xBase.BaseRoot).
 #   macOS/Linux: ~/Dev mit Unterordnern Repos/ und Root/ (Hierarchie)
 #   Windows:     feste Basis C:\woyCode fuer $mdsDev und $mdsRepos (Repos direkt darin).

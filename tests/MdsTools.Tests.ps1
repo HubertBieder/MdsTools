@@ -16,6 +16,8 @@
     1.3.0    2026-11-03  Hubi/Claude   run: Skripte scripts/_<Name>.ps1, Liste
     1.4.0    2026-11-03  Hubi/Claude   mdsWoy, Show-Mds
     1.2.1    2026-11-02  Hubi/Claude   Invoke-Make: Init.ps1/Post.ps1 nicht bei einzelnem Programm
+    1.5.0    2026-11-03  Hubi/Claude   Clear-BinFolder -Keep, Invoke-Make Schluessel Keep (8.2)
+    1.5.1    2026-11-03  Hubi/Claude   Backup-Develop: Rueckgabe Pfad/$null
 #>
 
 BeforeAll {
@@ -95,7 +97,10 @@ Describe 'Globale Variablen und Root-Ordner' {
 
     It 'Show-Mds zeigt Version, woy und alle Ordner mit Quelle' {
         $zeilen = Show-Mds 6>$null
-        $zeilen.Variable | Should -Be @('mdsVersion', 'mdsWoy', 'mdsDev', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp')
+        $soll = @('System', 'mdsVersion', 'mdsWoy', 'mdsDev', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp')
+        if ($IsWindows) { $soll += 'mdsWoySrc', 'mdsWoyBin', 'mdsWoyRun' }
+        $zeilen.Variable | Should -Be $soll
+        ($zeilen | Where-Object Variable -eq 'System').Wert | Should -Be $(if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' })
         ($zeilen | Where-Object Variable -eq 'mdsVersion').Wert | Should -Be "$mdsVersion"
         ($zeilen | Where-Object Variable -eq 'mdsDev').Quelle | Should -Be 'DEV_HOME'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Quelle | Should -Be 'Standard'
@@ -366,6 +371,28 @@ Describe 'Dateifunktionen' {
         (Get-ChildItem (Join-Path $bin 'Andere.app/Contents')).Name | Sort-Object | Should -Be @('app.pdb', 'Info.xml')
     }
 
+    It 'Clear-BinFolder -Keep behaelt weitere Ordner' {
+        $bin = Join-Path $script:arbeit 'bin'
+        New-Item -ItemType Directory -Path (Join-Path $bin 'Template'), (Join-Path $bin 'Bilder'), (Join-Path $bin 'fr') -Force | Out-Null
+        Clear-BinFolder $bin -Keep 'Template', 'Bilder' 6>$null | Out-Null
+        (Get-ChildItem $bin).Name | Sort-Object | Should -Be @('Bilder', 'Template')
+    }
+
+    It 'Backup-Develop liefert den Pfad der ZIP, ohne -force das vorhandene Archiv, sonst $null' {
+        $repo = Join-Path $script:arbeit 'Probe'
+        New-Item -ItemType Directory -Path (Join-Path $repo '.git') -Force | Out-Null
+        'x' | Set-Content (Join-Path $repo 'a.txt')
+        $ziel = Join-Path $script:arbeit 'ziel'
+        $zip = Backup-Develop -sourceDir $repo -targetDir $ziel -force 6>$null 3>$null
+        $zip | Should -BeOfType [string]
+        $zip | Should -BeLike "*Probe_$(Get-Date -Format yyyyMMdd).zip"
+        Test-Path -LiteralPath $zip | Should -BeTrue
+        Backup-Develop -sourceDir $repo -targetDir $ziel 6>$null 3>$null | Should -Be $zip
+        $ohneGit = Join-Path $script:arbeit 'OhneGit'
+        New-Item -ItemType Directory -Path $ohneGit | Out-Null
+        Backup-Develop -sourceDir $ohneGit -targetDir $ziel 6>$null 3>$null | Should -BeNullOrEmpty
+    }
+
     It 'Remove-OldFile behaelt die neuesten n Dateien' {
         1..5 | ForEach-Object {
             $datei = Join-Path $script:arbeit "bak$_.zip"
@@ -446,6 +473,14 @@ Describe 'Invoke-Make' {
         Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { -not $Package }
         Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' -Package 6>$null | Out-Null
         Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { $Package }
+    }
+
+    It 'Keep der Tabelle wird an Publish-DotNet weitergegeben' {
+        $tabelle = [ordered]@{ 'Vier' = @{ Project = 'src/V/V.csproj'; Keep = @('Template', 'Log') } }
+        Invoke-Make -Programme $tabelle -RepoRoot $script:repo 6>$null | Out-Null
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { ($Keep -join ',') -eq 'Template,Log' }
+        Invoke-Make -Programme $script:tabelle -RepoRoot $script:repo -Programm 'Zwei' 6>$null | Out-Null
+        Should -Invoke -ModuleName MdsTools Publish-DotNet -Times 1 -Exactly -ParameterFilter { $Keep.Count -eq 0 -and $Path -like '*Zwei.csproj' }
     }
 
     It 'meldet ein unbekanntes Programm mit $false' {

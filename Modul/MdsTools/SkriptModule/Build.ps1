@@ -362,6 +362,8 @@ function Test-MauiExe([string]$FileName) {
 # [public] Clear-BinFolder — Bereinigt ein Publish-/Bin-Verzeichnis: entfernt ueberfluessige
 # Dateien (mit -IsDebug bleiben *.pdb) und nicht benoetigte Unterordner. Behaelt die .mui-
 # Kulturordner der aktuellen UI-Sprache (sonst WinUI-Crash 0xC0000409).
+# -Keep: weitere Unterordner, die bleiben (z. B. Template, Bilder, Log im gemeinsamen Bin-Ordner).
+# 2026-11-03 Hubi/Claude: -Keep (8.2)
 function Clear-BinFolder {
     [CmdletBinding()]
     param
@@ -370,7 +372,10 @@ function Clear-BinFolder {
         [string]$Folder,
 
         [Parameter(Mandatory = $false, HelpMessage = "Es ist ein Debug Build")]
-        [switch]$IsDebug
+        [switch]$IsDebug,
+
+        [Parameter(Mandatory = $false, HelpMessage = "Weitere Unterordner, die erhalten bleiben")]
+        [string[]]$Keep = @()
     )
     Begin {
         if (($null -eq $Folder) -or ($Folder.Length -eq 0)) {
@@ -410,7 +415,7 @@ function Clear-BinFolder {
             # 2026-10-31 Hubi/Claude: *.app ergaenzt
             # 2026-11-02 Hubi/Claude: PlugIns ergaenzt - der TaskScheduler (Bin/Task) traegt seine Tasks in
             #                         PlugIns/<Name>; ein Neubau des Schedulers darf sie nicht loeschen
-            $keepFolders = @('runtimes', 'images', 'wwwRoot', 'Microsoft.UI.Xaml', 'NpuDetect', 'PlugIns')
+            $keepFolders = @('runtimes', 'images', 'wwwRoot', 'Microsoft.UI.Xaml', 'NpuDetect', 'PlugIns') + $Keep
             # WinUI 3 (MAUI-Windows) laedt beim Start die nativen .mui-Ressourcen
             # passend zur UI-Sprache des Rechners. Fehlt der Ordner der aktuellen
             # UI-Kultur (z. B. de-DE) bzw. der englische Fallback, bricht die App
@@ -514,7 +519,11 @@ function Publish-DotNet {
         # macOS-MAUI: Standard ist die direkt startbare .app im Zielordner; mit -Package
         # das Installationspaket (.pkg) zum Weitergeben.
         [Parameter(Mandatory = $False, HelpMessage = "macOS-MAUI: Installationspaket (.pkg) statt .app")]
-        [switch]$Package = $false
+        [switch]$Package = $false,
+
+        # Unterordner, die Clear-BinFolder zusaetzlich behaelt (2026-11-03 Hubi/Claude, 8.2)
+        [Parameter(Mandatory = $False, HelpMessage = "Unterordner, die beim Bereinigen bleiben")]
+        [string[]]$Keep = @()
     )
     process {
         $csProj = Find-CsProj -Proj $Path
@@ -745,7 +754,7 @@ function Publish-DotNet {
                 # benoetigten Dateien bereinigen (Clear-BinFolder).
                 # Bei einer API wird immer bereinigt, sonst steuerbar ueber -Clear/-Zip/-Run.
                 if ($Clear -or $Zip -or $Run -or $api) {
-                    Clear-BinFolder $targetDir
+                    Clear-BinFolder $targetDir -Keep $Keep
                 }
                 if ($Zip) {
                     New-ZipArchiv -Folder $targetDir | Out-Null
@@ -849,7 +858,8 @@ function Invoke-MakeHook([string] $Datei, [hashtable] $Argumente) {
 #   Programme  [ordered] Name -> @{ Project = <csproj relativ zu RepoRoot> (frueher Projekt, wird weiter verstanden)
 #                                   Group   = <optional: ein Buchstabe, Gross-/Kleinschreibung egal>
 #                                   OutDir  = <optional: relativ zu $mdsBin oder absolut>
-#                                   Nur     = <optional: 'Windows' oder 'MacOS'> }
+#                                   Nur     = <optional: 'Windows' oder 'MacOS'>
+#                                   Keep    = <optional: Unterordner, die Clear-BinFolder behaelt> }
 #   Gruppen    optional: Buchstabe -> Name der Gruppe (nur fuer die Anzeige)
 #   RepoRoot   Wurzel des Repos (Standard: aktueller Ordner)
 #   Programm   leer: alle Programme; +<Buchstaben>: alle Programme dieser Gruppen (z. B. +dI);
@@ -868,6 +878,7 @@ function Invoke-MakeHook([string] $Datei, [hashtable] $Argumente) {
 # 2026-10-31 Hubi/Claude: erstellt (MdsTools.md, Schritt 7)
 # 2026-11-02 Hubi/Claude: Gruppen (+<Buchstaben>), Init.ps1/Post.ps1, Logdatei, Schluessel Project
 # 2026-11-02 Hubi/Claude: Init.ps1/Post.ps1 nicht bei einzelnem Programm
+# 2026-11-03 Hubi/Claude: Schluessel Keep (8.2)
 function Invoke-Make {
     [CmdletBinding()]
     param
@@ -962,7 +973,8 @@ function Invoke-Make {
             Write-Start ($gruppe ? "$name  [$gruppe]" : $name)
             $ziel = if ($OutDir) { $OutDir } elseif ($p.OutDir) { $p.OutDir } else { "" }
             $projekt = Join-Path $RepoRoot (& $projektVon $p)
-            if (Publish-DotNet -Path $projekt -TargetDir $ziel -Clear -Package:$Package -Verbose:($VerbosePreference -eq 'Continue')) {
+            $behalten = @($p.Keep | Where-Object { $_ })
+            if (Publish-DotNet -Path $projekt -TargetDir $ziel -Clear -Keep $behalten -Package:$Package -Verbose:($VerbosePreference -eq 'Continue')) {
                 $erfolg++
             }
             else {

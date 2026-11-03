@@ -7,6 +7,7 @@
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
 #   2026-11-03  Hubi/Claude  Show-Mds
+#   2026-11-03  Hubi/Claude  Show-Mds: Zeile System, Windows-Zeilen mdsWoySrc/Bin/Run
 #
 # Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell, Show-Mds
 #======================================================================
@@ -472,6 +473,9 @@ function Show-Mds {
     $os = if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
     Write-Info "MdsTools $mdsVersion | woy $mdsWoy | PowerShell $($PSVersionTable.PSVersion) | $os"
 
+    # 2026-11-03 Hubi/Claude: Betriebssystem als eigene Zeile (Windows oder macOS sofort erkennbar)
+    $osVariable = if ($IsWindows) { 'IsWindows' } elseif ($IsMacOS) { 'IsMacOS' } else { 'IsLinux' }
+    [pscustomobject]@{ Variable = 'System'; Wert = $os; Quelle = $osVariable; Vorhanden = $null }
     [pscustomobject]@{ Variable = 'mdsVersion'; Wert = "$mdsVersion"; Quelle = 'MdsTools.psd1'; Vorhanden = $null }
     [pscustomobject]@{ Variable = 'mdsWoy'; Wert = "$mdsWoy"; Quelle = $os; Vorhanden = $null }
 
@@ -487,6 +491,19 @@ function Show-Mds {
             Wert      = $wert
             Quelle    = if ([Environment]::GetEnvironmentVariable($env)) { $env } else { 'Standard' }
             Vorhanden = [bool]($wert -and (Test-Path -LiteralPath $wert -PathType Container))
+        }
+    }
+
+    # 2026-11-03 Hubi/Claude: Legacy-Adressen der Auftragsabwicklung, nur unter Windows
+    if ($IsWindows) {
+        foreach ($name in 'mdsWoySrc', 'mdsWoyBin', 'mdsWoyRun') {
+            $wert = (Get-Variable -Name $name -Scope Global -ValueOnly -ErrorAction SilentlyContinue)
+            [pscustomobject]@{
+                Variable  = $name
+                Wert      = $wert
+                Quelle    = 'Legacy (fest)'
+                Vorhanden = [bool]($wert -and (Test-Path -LiteralPath $wert -PathType Container))
+            }
         }
     }
 }

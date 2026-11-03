@@ -7,6 +7,7 @@
 | Datum      | Version | Autor                | Änderung                                                     |
 | ---------- | ------- | -------------------- | ------------------------------------------------------------ |
 | 2026-11-03 | 1.0     | Hubert Bieder/Claude | Aus MdsTools.md herausgelöst (Versionen 0.1–0.18 siehe dort) |
+| 2026-11-03 | 1.1     | Hubert Bieder/Claude | E8: JSON-Verfahren entfällt ab 8.2 ganz                      |
 
 ## Inhalt und Abgrenzung
 
@@ -54,7 +55,7 @@ Die Erweiterungen für die Auftragsabwicklung werden nur unter Windows geladen, 
 | E5  | Installation: kopieren oder verlinken? | **Kopieren** in den Benutzer-Modulpfad (wie bisher). Entwicklung über `Import-Module ./Modul/MdsTools -Force`.                                            | entschieden |
 | E6  | Name des Bau-Skripts                   | **`scripts/Make.ps1`** (einheitlich zu `Make-*.ps1`), Aufruf über `mk`.                                                                                   | entschieden |
 | E7  | Name des Aufräum-Skripts               | **`Uninstall.ps1`** statt `clear.ps1` (passend zu `Install.ps1`, kein Konflikt mit dem Befehl `clear`).                                                   | entschieden |
-| E8  | JSON-Verfahren                         | Komplett nach `MdsSkripte` (nur Windows), im Modul selbst entfernen.                                                                                      | entschieden |
+| E8  | JSON-Verfahren                         | **Entfällt ab 8.2 ganz** (auch nicht in `MdsSkripte`); Projekte wie `Auftrag.mds` baut `scripts/Make.ps1`.                                               | entschieden |
 | E9  | `Update-PowerShell` vs. `UpdatePS.ps1` | Das Update erledigt das Modul (`Update-PowerShell`). `UpdatePS.ps1` entfällt.                                                                             | entschieden |
 | E10 | Binärordner                            | Standard `$mdsBin/<Kurzname>/<Programm>/`; je Programm in `Make.ps1` oder per `-OutDir` übersteuerbar (siehe [Ausgabeordner](MdsTools.md#ausgabeordner)). | entschieden |
 | E11 | Schlecht benannte Cmdlets              | Werden umbenannt (siehe [Umbenennungen](#umbenennungen)).                                                                                                 | entschieden |
@@ -121,7 +122,7 @@ da mdsPackage und MdsTools nie gleichzeitig geladen werden.
 
 - **Git** (`GitUtil.psm1`: `Invoke-Commit`, `Invoke-Push`, `Show-Git*`, `Get-GitRepos` …): entfällt, siehe [E4](#entscheidungen).
 - **JSON-Verfahren** (`New-Package`, `Read-PackageDefinition`, `Invoke-PackageBuild`, `Get-PackageTargetDirs`,
-  `Show-MdsPackage`, `Get-MDS`): wandert nach `MdsSkripte` oder entfällt.
+  `Show-MdsPackage`, `Get-MDS`, `Test-Package`): entfällt ab 8.2 ganz, `*.mds`-Dateien werden nicht mehr unterstützt.
 - **woy** (`Enable-WoyTls`, `Get-UncShareRoot`): wandert nach `MdsSkripte`.
 - **Intern** (`Test-IsAdmin`, `Assert-Admin`, `Start-Spinner`, `Initialize-LogFile` …): werden mit übernommen,
   aber nicht exportiert.
