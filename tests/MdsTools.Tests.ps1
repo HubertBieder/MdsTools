@@ -32,6 +32,7 @@ BeforeAll {
     # Schutz: Die Tests schreiben scripts/Make.ps1 in $mdsRepos und duerfen nie die echten Repos treffen
     if (-not $mdsRepos.StartsWith($TestDrive.ToString())) { throw "mdsRepos zeigt nicht in den TestDrive: $mdsRepos" }
     New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'Net/src') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'Net/.git') -Force | Out-Null
 }
 
 AfterAll {
@@ -136,9 +137,21 @@ Describe 'go' {
         (Get-Location).Path | Should -Be $mdsRoot
     }
 
+    It 'springt nach repos' {
+        go repos
+        (Get-Location).Path | Should -Be $mdsRepos
+    }
+
     It 'springt in ein Repo per Kurzname' {
         go net
         (Get-Location).Path | Should -Be (Join-Path $mdsRepos 'Net')
+    }
+
+    It 'springt nicht in Ordner ohne .git' {
+        New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'OhneGit') -Force | Out-Null
+        $warnung = go OhneGit 3>&1
+        $warnung | Should -Match 'Unbekanntes Ziel'
+        (Get-Location).Path | Should -Be $TestDrive.ToString()
     }
 
     It 'warnt bei unbekanntem Ziel und bleibt stehen' {

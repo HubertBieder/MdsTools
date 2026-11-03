@@ -1,13 +1,15 @@
 ﻿<#
 .SYNOPSIS
-    Holt bzw. aktualisiert die Entwicklungs-Repositories unter ~/Dev/Repos (Windows/MARS und macOS/LUNA).
+    Holt bzw. aktualisiert die Entwicklungs-Repositories (macOS: ~/Dev/Repos, Windows: C:\woyCode).
 
 .DESCRIPTION
     Für jedes Repository aus der Repo-Tabelle (GitHub-Name -> lokaler Kurzname):
       - nicht vorhanden          -> git clone nach Repos/<Kurzname>
       - vorhanden, sauber        -> git pull --ff-only
       - vorhanden, mit lokalen Änderungen -> Warnung, wird übersprungen (nichts wird gelöscht)
-    Dev ist der Ordner, in dem das Skript liegt (~/Dev); $env:DEV_HOME bzw. $env:DEV_REPOS übersteuern.
+    macOS/Linux: Dev ist der Ordner, in dem das Skript liegt (~/Dev), die Repos liegen in Dev/Repos.
+    Windows:     feste Basis C:\woyCode, die Repos liegen direkt darin (wie $mdsRepos in MdsTools).
+    $env:DEV_HOME bzw. $env:DEV_REPOS übersteuern.
 
 .PARAMETER Repos
     Kurznamen oder GitHub-Namen. Standard: alle aus der Repo-Tabelle (Mds, Net, Maui, PHB).
@@ -25,13 +27,15 @@
     2.1.0    2026-10-29  Claude/Hubi   GitHub-User HubertBieder fest in der URL, Prüfung Credential-Helper
     3.0.0    2026-10-31  Hubi/Claude   Repo-Tabelle mit Kurznamen, Ziel ~/Dev/Repos, MdsTools statt mdsPackage
     3.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, DEV_REPOS
+    3.2.0    2026-11-03  Hubi/Claude   Windows: Repos direkt in C:\woyCode statt C:\woyCode\Repos;
+                                       Zielverzeichnis am Ende ausgeben
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.1.0'
+$ScriptVersion = '3.2.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -48,14 +52,23 @@ $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
 $hostName  = [System.Net.Dns]::GetHostName()
 
-# --- Dev bestimmen: Ordner des Skripts (~/Dev). Laeuft es direkt aus dem Repo
-#     (Repos/Mds/Skripte), drei Ebenen nach oben. $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
-$DevDir = $PSScriptRoot
-if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Leaf) -eq 'Repos') {
-    $DevDir = Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Parent
+# --- Dev und Repos bestimmen (gleiche Logik wie InitModule.ps1 in MdsTools).
+#     Windows: feste Basis C:\woyCode, Repos direkt darin (eine Ebene).
+#     macOS/Linux: Ordner des Skripts (~/Dev); laeuft es direkt aus dem Repo (Repos/Mds/Skripte),
+#     drei Ebenen nach oben; Repos in Dev/Repos.
+#     $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
+if ($onWindows) {
+    $DevDir = if ($env:DEV_HOME) { $env:DEV_HOME } else { 'C:\woyCode' }
+    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $DevDir }
 }
-if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
-$ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }
+else {
+    $DevDir = $PSScriptRoot
+    if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Leaf) -eq 'Repos') {
+        $DevDir = Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Parent
+    }
+    if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
+    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }
+}
 
 # --- Auswahl: Kurz- oder GitHub-Namen auf Tabelleneinträge abbilden ---
 $auswahl = [ordered]@{}
@@ -118,4 +131,5 @@ $result = foreach ($repo in $auswahl.Keys) {
 }
 
 Write-Host ''
-$result | Format-Table -AutoSize
+$result | Format-Table -AutoSize | Out-Host
+Write-Host "Zielverzeichnis: $ReposDir" -ForegroundColor Cyan

@@ -7,36 +7,47 @@
 #   2026-10-31  Hubi/Claude  Erstellt (MdsTools.md, Abschnitt Befehle)
 #   2026-11-01  Hubi/Claude  mk: Repo des aktuellen Ordners, -Package
 #   2026-11-03  Hubi/Claude  run: Skripte mit Praefix _ in scripts/ ausfuehren und auflisten
+#   2026-11-03  Hubi/Claude  go repos (unter Windows gleich go dev = C:\woyCode)
+#   2026-11-03  Hubi/Claude  go: nur Ordner mit .git (keine Laufzeitordner unter C:\woyCode)
 #
 # Oeffentlich: go, mk, run
 #======================================================================
 
-# [intern] Liefert alle gueltigen Sprungziele fuer go: dev, root und die Repo-Kurznamen.
-function Get-GoTarget {
-    $repos = Get-ChildItem -LiteralPath $mdsRepos -Directory -ErrorAction SilentlyContinue |
+# [intern] Git-Repos unter $mdsRepos: nur Ordner mit .git (Ordner oder Datei bei Worktrees).
+# Unter Windows liegen in C:\woyCode auch Bin, Config, ... - die sind keine Sprungziele;
+# die woy-Repos der Auftragsabwicklung (nur Windows) haben .git und gehoeren dazu.
+function Get-GoRepo {
+    Get-ChildItem -LiteralPath $mdsRepos -Directory -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '.git') } |
         Select-Object -ExpandProperty Name
-    return @('dev', 'root') + @($repos)
+}
+
+# [intern] Liefert alle gueltigen Sprungziele fuer go: dev, repos, root und die Repo-Kurznamen.
+function Get-GoTarget {
+    return @('dev', 'repos', 'root') + @(Get-GoRepo)
 }
 
 # [public] go — Wechselt in einen Ordner. Gross-/Kleinschreibung spielt keine Rolle.
 #   go / go dev   -> $mdsDev
+#   go repos      -> $mdsRepos
 #   go root       -> $mdsRoot
-#   go <Kurzname> -> $mdsRepos/<Kurzname>
+# Unter Windows zeigen dev, repos und root auf denselben Ordner (C:\woyCode).
+#   go <Kurzname> -> $mdsRepos/<Kurzname> (nur Ordner mit .git)
 function go {
     [CmdletBinding()]
     param
     (
-        [Parameter(Position = 0, Mandatory = $false, HelpMessage = "dev, root oder Repo-Kurzname")]
+        [Parameter(Position = 0, Mandatory = $false, HelpMessage = "dev, repos, root oder Repo-Kurzname")]
         [string] $Ziel = 'dev'
     )
     switch ($Ziel.ToLowerInvariant()) {
         'dev' { Set-Location -LiteralPath $mdsDev; return }
+        'repos' { Set-Location -LiteralPath $mdsRepos; return }
         'root' { Set-Location -LiteralPath $mdsRoot; return }
     }
-    $repo = Get-ChildItem -LiteralPath $mdsRepos -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -eq $Ziel } | Select-Object -First 1
+    $repo = Get-GoRepo | Where-Object { $_ -eq $Ziel } | Select-Object -First 1
     if ($repo) {
-        Set-Location -LiteralPath $repo.FullName
+        Set-Location -LiteralPath (Join-Path $mdsRepos $repo)
     }
     else {
         Write-Warning "Unbekanntes Ziel '$Ziel'. Gültig: $((Get-GoTarget) -join ', ')"

@@ -23,6 +23,8 @@
 | 2026-11-03 | 0.17    | Hubert Bieder/Claude | `run`: Repo-Skripte `scripts/_<Name>.ps1` ausführen und auflisten                         |
 | 2026-11-03 | 0.18    | Hubert Bieder/Claude | `$mdsWoy`, `Show-Mds`; Systematik nach MDS-Development.md verschoben                      |
 | 2026-11-03 | 0.19    | Hubert Bieder/Claude | Migration nach MdsTools-Migration.md; Kapitel Auftragsabwicklung (Gerüst)                 |
+| 2026-11-03 | 0.20    | Hubert Bieder/Claude | `go repos`; CloneAll unter Windows direkt nach `C:\woyCode`                               |
+| 2026-11-03 | 0.21    | Hubert Bieder/Claude | `go`: nur Ordner mit `.git`                                                               |
 
 ---
 
@@ -136,7 +138,7 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | `$mdsVersion` | `8.x` aus Manifest  | `8.x` aus Manifest  | Modulversion, auf allen Systemen gleich (A2) |
 | `$mdsWoy`     | `0`                 | `26`                | woy-Stand des Systems, `[int]`               |
 | `$mdsDev`     | `/Users/hubert/Dev` | `C:\woyCode`        | Einstiegspunkt, Ziel von `go dev`            |
-| `$mdsRepos`   | `$mdsDev/Repos`     | `C:\woyCode`        | Git-Clones                                   |
+| `$mdsRepos`   | `$mdsDev/Repos`     | `C:\woyCode`        | Git-Clones, Ziel von `go repos`              |
 | `$mdsRoot`    | `$mdsDev/Root`      | `C:\woyCode`        | Laufzeitumgebung, Ziel von `go root`         |
 | `$mdsBin`     | `$mdsRoot/Bin`      | `C:\woyCode\Bin`    | gebaute Programme, steht im `PATH`           |
 | `$mdsConfig`  | `$mdsRoot/Config`   | `C:\woyCode\Config` | Konfiguration je Programm                    |
@@ -168,14 +170,20 @@ Verb-Substantiv-Schema.
 `go` ist eine **Funktion**, kein Alias: ein Alias kann keine Argumente verarbeiten. Groß- und Kleinschreibung des
 Arguments spielt keine Rolle.
 
-| Aufruf      | Ziel                                |
-| ----------- | ----------------------------------- |
-| `go`        | `$mdsDev`                           |
-| `go dev`    | `$mdsDev`                           |
-| `go root`   | `$mdsRoot`                          |
-| `go <Kurz>` | `$mdsRepos/<Kurz>` (z. B. `go net`) |
+| Aufruf      | Ziel                                                         |
+| ----------- | ------------------------------------------------------------ |
+| `go`        | `$mdsDev`                                                    |
+| `go dev`    | `$mdsDev`                                                    |
+| `go repos`  | `$mdsRepos`                                                  |
+| `go root`   | `$mdsRoot`                                                   |
+| `go <Kurz>` | `$mdsRepos/<Kurz>` (z. B. `go net`), nur Ordner mit `.git`   |
 
-- Die Namen `dev` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
+- Die Namen `dev`, `repos` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
+- Unter Windows führen `go`, `go dev`, `go repos` und `go root` alle nach `C:\woyCode`; die Unterscheidung
+  ist für macOS gedacht, schadet unter Windows aber nicht.
+- Außer den festen Zielen springt `go` nur in Ordner unter `$mdsRepos`, die ein `.git` enthalten. Unter Windows
+  sind damit die Laufzeitordner (`Bin`, `Config`, …) ausgeschlossen, die woy-Repos der Auftragsabwicklung aber
+  erreichbar; unter macOS gibt es diese nicht.
 - Die Tab-Vervollständigung der Kurznamen erfolgt über `Register-ArgumentCompleter`.
 - Ein unbekanntes Ziel erzeugt eine Warnung mit der Liste der gültigen Ziele.
 - Die Repo-Namen werden bei jedem Aufruf (auch bei jeder Tab-Vervollständigung) aus `$mdsRepos` gelesen, es gibt
@@ -465,7 +473,6 @@ MdsTools und die neuen Pfade umgestellt (siehe [MdsTools-Migration.md](MdsTools-
 
 ## Offene Punkte
 
-- `go` unter Windows: nur echte Repos (z. B. mit `.git`) anbieten, nicht die Laufzeitordner.
 - Repo `MdsTools` auf GitHub ist noch leer: Erster Push von `Repos/Mds` steht aus (`git push -u origin main`).
 - Die Kurzbefehle `2Net`, `2Maui` … und der Alias `zip` des alten Profils entfallen (`go` bzw. `Save-Develop`).
 - Präfix für neue Cmdlets festlegen (z. B. `Mds`) – betrifft nur neue Funktionen, nicht die übernommenen.
