@@ -9,6 +9,7 @@
 #   2026-11-01  Hubi/Claude  DEV_HOME statt DEV_ROOT fuer ~/Dev; DEV_<Ordner> lenkt jeden Ordner um
 #   2026-11-03  Hubi/Claude  Windows: feste Basis C:\woyCode, Repos und Root auf derselben Ebene
 #   2026-11-03  Hubi/Claude  $mdsWoy (Windows 26, sonst 0)
+#   2026-11-03  Hubi/Claude  Windows: Root auf D:\Dev\Root, wenn Laufwerk D: vorhanden
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -34,14 +35,17 @@ $global:mdsVersion = [version](Import-PowerShellDataFile -LiteralPath (Join-Path
 $global:mdsWoy = [int]$(if ($IsWindows) { 26 } else { 0 })
 # 2026-11-03 Hubi/Claude: Windows und macOS unterscheiden (wie xBase.BaseRoot).
 #   macOS/Linux: ~/Dev mit Unterordnern Repos/ und Root/ (Hierarchie)
-#   Windows:     feste Basis C:\woyCode; $mdsDev, $mdsRepos und $mdsRoot zeigen auf denselben
-#                Ordner, Bin/Config/... liegen direkt darunter (eine Verzeichnisebene)
+#   Windows:     feste Basis C:\woyCode fuer $mdsDev und $mdsRepos (Repos direkt darin).
+#                $mdsRoot = D:\Dev\Root, wenn es ein Laufwerk D: gibt (MARS), sonst C:\woyCode.
+#                Fehlende Ordner (Root, Bin, Config, ...) werden unten angelegt.
 # DEV_<NAME> lenkt auf beiden Systemen weiterhin genau den Ordner <Name> um.
 $mdsWindowsBasis = 'C:\woyCode'
 if ($IsWindows) {
     $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { $mdsWindowsBasis }
     $global:mdsRepos = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $mdsDev }
-    $global:mdsRoot = if ($env:DEV_ROOT) { $env:DEV_ROOT } else { $mdsDev }
+    $global:mdsRoot = if ($env:DEV_ROOT) { $env:DEV_ROOT }
+    elseif (Test-Path -LiteralPath 'D:\' -PathType Container) { 'D:\Dev\Root' }
+    else { $mdsDev }
 }
 else {
     $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path $HOME 'Dev' }
@@ -56,7 +60,7 @@ $global:mdsLogs = Get-DevOrdner 'Logs' $mdsRoot
 $global:mdsTemp = Get-DevOrdner 'Temp' $mdsRoot
 Remove-Item Function:Get-DevOrdner
 
-foreach ($ordner in $mdsRepos, $mdsBin, $mdsConfig, $mdsData, $mdsLogs, $mdsTemp) {
+foreach ($ordner in $mdsRepos, $mdsRoot, $mdsBin, $mdsConfig, $mdsData, $mdsLogs, $mdsTemp) {
     if (-not (Test-Path -LiteralPath $ordner -PathType Container)) {
         $null = New-Item -Path $ordner -ItemType Directory -Force -ErrorAction SilentlyContinue
     }

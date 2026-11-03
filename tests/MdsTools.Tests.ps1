@@ -26,6 +26,9 @@ BeforeAll {
     }
     $script:alterPath = $env:PATH
     $env:DEV_HOME = Join-Path $TestDrive 'Dev'
+    # Windows: Root laege sonst auf D:\Dev\Root (echtes Laufwerk) - in den TestDrive lenken
+    $script:testRoot = if ($IsWindows) { Join-Path $TestDrive 'Root' } else { $null }
+    $env:DEV_ROOT = $script:testRoot
     $script:manifest = Join-Path $PSScriptRoot '../Modul/MdsTools/MdsTools.psd1'
     Remove-Module MdsTools -ErrorAction SilentlyContinue
     Import-Module $script:manifest -Force
@@ -69,9 +72,9 @@ Describe 'Globale Variablen und Root-Ordner' {
     It 'leitet alle Pfade aus DEV_HOME ab' {
         $mdsDev | Should -Be $env:DEV_HOME
         if ($IsWindows) {
-            # Windows: Repos und Root liegen auf derselben Ebene wie $mdsDev
+            # Windows: Repos liegen direkt in $mdsDev, Root ist im Test per DEV_ROOT umgelenkt
             $mdsRepos | Should -Be $mdsDev
-            $mdsRoot | Should -Be $mdsDev
+            $mdsRoot | Should -Be $script:testRoot
         }
         else {
             $mdsRepos | Should -Be (Join-Path $mdsDev 'Repos')
@@ -112,7 +115,7 @@ Describe 'Globale Variablen und Root-Ordner' {
             $mdsConfig | Should -Be $env:DEV_CONFIG
         }
         finally {
-            $env:DEV_REPOS = $null; $env:DEV_ROOT = $null; $env:DEV_CONFIG = $null
+            $env:DEV_REPOS = $null; $env:DEV_ROOT = $script:testRoot; $env:DEV_CONFIG = $null
             Import-Module $script:manifest -Force
         }
     }

@@ -25,6 +25,7 @@
 | 2026-11-03 | 0.19    | Hubert Bieder/Claude | Migration nach MdsTools-Migration.md; Kapitel Auftragsabwicklung (Gerüst)                 |
 | 2026-11-03 | 0.20    | Hubert Bieder/Claude | `go repos`; CloneAll unter Windows direkt nach `C:\woyCode`                               |
 | 2026-11-03 | 0.21    | Hubert Bieder/Claude | `go`: nur Ordner mit `.git`                                                               |
+| 2026-11-03 | 0.22    | Hubert Bieder/Claude | Windows: `$mdsRoot` = `D:\Dev\Root`, wenn Laufwerk D: vorhanden                            |
 
 ---
 
@@ -139,12 +140,14 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | `$mdsWoy`     | `0`                 | `26`                | woy-Stand des Systems, `[int]`               |
 | `$mdsDev`     | `/Users/hubert/Dev` | `C:\woyCode`        | Einstiegspunkt, Ziel von `go dev`            |
 | `$mdsRepos`   | `$mdsDev/Repos`     | `C:\woyCode`        | Git-Clones, Ziel von `go repos`              |
-| `$mdsRoot`    | `$mdsDev/Root`      | `C:\woyCode`        | Laufzeitumgebung, Ziel von `go root`         |
-| `$mdsBin`     | `$mdsRoot/Bin`      | `C:\woyCode\Bin`    | gebaute Programme, steht im `PATH`           |
-| `$mdsConfig`  | `$mdsRoot/Config`   | `C:\woyCode\Config` | Konfiguration je Programm                    |
-| `$mdsData`    | `$mdsRoot/Data`     | `C:\woyCode\Data`   | Laufzeitdaten der Services                   |
-| `$mdsLogs`    | `$mdsRoot/Logs`     | `C:\woyCode\Logs`   | Protokolle                                   |
-| `$mdsTemp`    | `$mdsRoot/Temp`     | `C:\woyCode\Temp`   | Zwischendateien, Freigabe-Mounts (macOS)     |
+| `$mdsRoot`    | `$mdsDev/Root`      | `D:\Dev\Root` ¹     | Laufzeitumgebung, Ziel von `go root`         |
+| `$mdsBin`     | `$mdsRoot/Bin`      | `$mdsRoot\Bin`      | gebaute Programme, steht im `PATH`           |
+| `$mdsConfig`  | `$mdsRoot/Config`   | `$mdsRoot\Config`   | Konfiguration je Programm                    |
+| `$mdsData`    | `$mdsRoot/Data`     | `$mdsRoot\Data`     | Laufzeitdaten der Services                   |
+| `$mdsLogs`    | `$mdsRoot/Logs`     | `$mdsRoot\Logs`     | Protokolle                                   |
+| `$mdsTemp`    | `$mdsRoot/Temp`     | `$mdsRoot\Temp`     | Zwischendateien, Freigabe-Mounts (macOS)     |
+
+¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\woyCode`. Fehlende Ordner legt MdsTools beim Laden an.
 
 - `$mdsWoy` ist bewusst ein Integer: Skripte können `if ($mdsWoy -ge 26)` oder `if (-not $mdsWoy)` prüfen.
   Der Wert 26 steht in `InitModule.ps1` als Konstante.
@@ -179,8 +182,8 @@ Arguments spielt keine Rolle.
 | `go <Kurz>` | `$mdsRepos/<Kurz>` (z. B. `go net`), nur Ordner mit `.git`   |
 
 - Die Namen `dev`, `repos` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
-- Unter Windows führen `go`, `go dev`, `go repos` und `go root` alle nach `C:\woyCode`; die Unterscheidung
-  ist für macOS gedacht, schadet unter Windows aber nicht.
+- Unter Windows führen `go`, `go dev` und `go repos` nach `C:\woyCode`, `go root` nach `D:\Dev\Root`
+  (ohne Laufwerk D: ebenfalls `C:\woyCode`).
 - Außer den festen Zielen springt `go` nur in Ordner unter `$mdsRepos`, die ein `.git` enthalten. Unter Windows
   sind damit die Laufzeitordner (`Bin`, `Config`, …) ausgeschlossen, die woy-Repos der Auftragsabwicklung aber
   erreichbar; unter macOS gibt es diese nicht.
@@ -462,7 +465,7 @@ MdsTools und die neuen Pfade umgestellt (siehe [MdsTools-Migration.md](MdsTools-
 
 ### Einrichten und Testen auf MARS
 
-- [ ] `Install.ps1` ausführen, neue Shell: `Show-Mds` zeigt `woy 26` und alle Ordner unter `C:\woyCode`.
+- [ ] `Install.ps1` ausführen, neue Shell: `Show-Mds` zeigt `woy 26`, Dev/Repos `C:\woyCode`, Root `D:\Dev\Root`.
 - [ ] `%USERPROFILE%\.woy\woy.env` vorhanden und vollständig (`Get-WoyEnvPath`, `Get-WoyValue …`).
 - [ ] `Get-WoyCredential server` liefert eine Anmeldung.
 - [ ] `go`, `mk`, `run` in `C:\woyCode` (flache Struktur) prüfen.
