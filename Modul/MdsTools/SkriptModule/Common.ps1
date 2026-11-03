@@ -5,6 +5,7 @@
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
+#   2026-11-03  Hubi/Claude  Resolve-MdsPath: fehlender Pfad mit -AllowMissing ohne Ausnahme
 #
 # Oeffentlich: - (nur intern)
 #======================================================================
@@ -23,6 +24,13 @@ function Resolve-MdsPath([string] $Path, [string] $BasePath = "", [switch] $Allo
         }
 
         $candidatePath = Join-Path -Path $BasePath -ChildPath $candidatePath
+    }
+
+    # Fehlender Pfad + AllowMissing: ohne Resolve-Path - dessen abgefangene Ausnahme landet sonst
+    # als "PS>TerminatingError" im Transcript (Make-Logs).
+    # 2026-11-03 Hubi/Claude
+    if ($AllowMissing -and -not (Test-Path -LiteralPath $candidatePath)) {
+        return [System.IO.Path]::GetFullPath($candidatePath)
     }
 
     try {
