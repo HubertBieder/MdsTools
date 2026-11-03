@@ -9,7 +9,7 @@
 | 2026-10-31 | 0.1     | Hubert Bieder/Claude | Erste Fassung (LUNA/MARS, `~/Dev`, Repos, Kurznamen)                                                  |
 | 2026-11-01 | 0.2     | Hubert Bieder/Claude | `DEV_<NAME>` lenkt genau den Ordner `<Name>` um (`DEV_HOME` = `~/Dev`)                                |
 | 2026-11-03 | 1.0     | Hubert Bieder/Claude | Neu gegliedert: nur Systematik; Windows flach unter `C:\woyCode`; `$mdsWoy`; Umsetzung in MdsTools.md |
-| 2026-11-03 | 1.1     | Hubert Bieder/Claude | Windows: Root auf `D:\Dev\Root`, wenn Laufwerk D: vorhanden                                          |
+| 2026-11-03 | 1.1     | Hubert Bieder/Claude | Windows: Root auf `D:\Dev\Root`, ohne Laufwerk D: auf `C:\Dev\Root`                                 |
 
 ## Inhalt und Abgrenzung
 
@@ -82,21 +82,19 @@ Unter Windows stehen Dev und Repos **nicht in einer Hierarchie, sondern auf eine
 Basis ist fest `C:\woyCode`; `$mdsDev` und `$mdsRepos` zeigen auf denselben Ordner, die Repos liegen direkt darin.
 
 Root liegt **auf Laufwerk D:**, wenn es eines gibt (MARS): `D:\Dev\Root`. Fehlen `D:\Dev\Root` oder die
-Laufzeitordner, legt MdsTools sie beim Laden an. Ohne Laufwerk D: liegt Root ebenfalls flach in `C:\woyCode`.
+Laufzeitordner, legt MdsTools sie beim Laden an. Ohne Laufwerk D: liegt Root auf `C:\Dev\Root`.
 
 ```text
 C:\woyCode\           # $mdsDev = $mdsRepos
    *.ps1              # globale Verwaltungsskripte
    Mds\  Net\  Maui\  …   # Repos (Kurznamen), dazu die woy-Repos
 
-D:\Dev\Root\         # $mdsRoot (ohne Laufwerk D: = C:\woyCode)
+D:\Dev\Root\         # $mdsRoot (ohne Laufwerk D: C:\Dev\Root)
    Bin\  Config\  Data\  Logs\  Temp\   # Laufzeitordner
 ```
 
 Folgen der flachen Struktur:
 
-- Ohne Laufwerk D: sind `Bin`, `Config`, `Data`, `Logs` und `Temp` reservierte Namen und dürfen kein
-  Repo-Kurzname sein.
 - Wer alle Repos braucht, darf nicht einfach alle Unterordner von `$mdsRepos` nehmen, sondern muss Repos erkennen
   (z. B. an `.git` oder an `scripts/Make.ps1`).
 
@@ -106,7 +104,7 @@ Folgen der flachen Struktur:
 | -------------------- | ------------------- | ------------------- |
 | Dev                  | `/Users/hubert/Dev` | `C:\woyCode`        |
 | Repos                | `~/Dev/Repos`       | `C:\woyCode`        |
-| Root                 | `~/Dev/Root`        | `D:\Dev\Root` (ohne D: `C:\woyCode`) |
+| Root                 | `~/Dev/Root`        | `D:\Dev\Root` (ohne D: `C:\Dev\Root`) |
 | Bin … Temp           | `~/Dev/Root/<Name>` | `<Root>\<Name>`     |
 | Basis abgeleitet aus | `$HOME`             | fest eingetragen    |
 

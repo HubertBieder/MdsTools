@@ -9,7 +9,7 @@
 #   2026-11-01  Hubi/Claude  DEV_HOME statt DEV_ROOT fuer ~/Dev; DEV_<Ordner> lenkt jeden Ordner um
 #   2026-11-03  Hubi/Claude  Windows: feste Basis C:\woyCode, Repos und Root auf derselben Ebene
 #   2026-11-03  Hubi/Claude  $mdsWoy (Windows 26, sonst 0)
-#   2026-11-03  Hubi/Claude  Windows: Root auf D:\Dev\Root, wenn Laufwerk D: vorhanden
+#   2026-11-03  Hubi/Claude  Windows: Root auf D:\Dev\Root, wenn Laufwerk D: vorhanden, sonst C:\Dev\Root
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -36,7 +36,7 @@ $global:mdsWoy = [int]$(if ($IsWindows) { 26 } else { 0 })
 # 2026-11-03 Hubi/Claude: Windows und macOS unterscheiden (wie xBase.BaseRoot).
 #   macOS/Linux: ~/Dev mit Unterordnern Repos/ und Root/ (Hierarchie)
 #   Windows:     feste Basis C:\woyCode fuer $mdsDev und $mdsRepos (Repos direkt darin).
-#                $mdsRoot = D:\Dev\Root, wenn es ein Laufwerk D: gibt (MARS), sonst C:\woyCode.
+#                $mdsRoot = D:\Dev\Root, wenn es ein Laufwerk D: gibt (MARS), sonst C:\Dev\Root.
 #                Fehlende Ordner (Root, Bin, Config, ...) werden unten angelegt.
 # DEV_<NAME> lenkt auf beiden Systemen weiterhin genau den Ordner <Name> um.
 $mdsWindowsBasis = 'C:\woyCode'
@@ -45,7 +45,7 @@ if ($IsWindows) {
     $global:mdsRepos = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $mdsDev }
     $global:mdsRoot = if ($env:DEV_ROOT) { $env:DEV_ROOT }
     elseif (Test-Path -LiteralPath 'D:\' -PathType Container) { 'D:\Dev\Root' }
-    else { $mdsDev }
+    else { 'C:\Dev\Root' }
 }
 else {
     $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path $HOME 'Dev' }

@@ -25,7 +25,7 @@
 | 2026-11-03 | 0.19    | Hubert Bieder/Claude | Migration nach MdsTools-Migration.md; Kapitel Auftragsabwicklung (Gerüst)                 |
 | 2026-11-03 | 0.20    | Hubert Bieder/Claude | `go repos`; CloneAll unter Windows direkt nach `C:\woyCode`                               |
 | 2026-11-03 | 0.21    | Hubert Bieder/Claude | `go`: nur Ordner mit `.git`                                                               |
-| 2026-11-03 | 0.22    | Hubert Bieder/Claude | Windows: `$mdsRoot` = `D:\Dev\Root`, wenn Laufwerk D: vorhanden                            |
+| 2026-11-03 | 0.22    | Hubert Bieder/Claude | Windows: `$mdsRoot` = `D:\Dev\Root`, ohne Laufwerk D: `C:\Dev\Root`                      |
 
 ---
 
@@ -147,7 +147,7 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | `$mdsLogs`    | `$mdsRoot/Logs`     | `$mdsRoot\Logs`     | Protokolle                                   |
 | `$mdsTemp`    | `$mdsRoot/Temp`     | `$mdsRoot\Temp`     | Zwischendateien, Freigabe-Mounts (macOS)     |
 
-¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\woyCode`. Fehlende Ordner legt MdsTools beim Laden an.
+¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\Dev\Root`. Fehlende Ordner legt MdsTools beim Laden an.
 
 - `$mdsWoy` ist bewusst ein Integer: Skripte können `if ($mdsWoy -ge 26)` oder `if (-not $mdsWoy)` prüfen.
   Der Wert 26 steht in `InitModule.ps1` als Konstante.
@@ -183,7 +183,7 @@ Arguments spielt keine Rolle.
 
 - Die Namen `dev`, `repos` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
 - Unter Windows führen `go`, `go dev` und `go repos` nach `C:\woyCode`, `go root` nach `D:\Dev\Root`
-  (ohne Laufwerk D: ebenfalls `C:\woyCode`).
+  (ohne Laufwerk D: nach `C:\Dev\Root`).
 - Außer den festen Zielen springt `go` nur in Ordner unter `$mdsRepos`, die ein `.git` enthalten. Unter Windows
   sind damit die Laufzeitordner (`Bin`, `Config`, …) ausgeschlossen, die woy-Repos der Auftragsabwicklung aber
   erreichbar; unter macOS gibt es diese nicht.
