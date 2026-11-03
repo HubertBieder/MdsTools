@@ -7,6 +7,8 @@
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Neu fuer MdsTools (ersetzt Set-Global/woy-Variablen)
 #   2026-11-01  Hubi/Claude  DEV_HOME statt DEV_ROOT fuer ~/Dev; DEV_<Ordner> lenkt jeden Ordner um
+#   2026-11-03  Hubi/Claude  Windows: feste Basis C:\woyCode, Repos und Root auf derselben Ebene
+#   2026-11-03  Hubi/Claude  $mdsWoy (Windows 26, sonst 0)
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -19,16 +21,34 @@ try {
 catch { }
 
 # Globale Variablen (MdsTools.md, Abschnitt Globale Variablen).
-# Regel: $env:DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_HOME = ~/Dev, DEV_ROOT = ~/Dev/Root).
+# Regel: $env:DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_HOME = ~/Dev bzw. C:\woyCode, DEV_ROOT = ~/Dev/Root).
 # Gleiche Logik wie die C#-Klasse xBase.BaseRoot in NetCoreLib2026.
 function Get-DevOrdner([string]$Name, [string]$Basis) {
     $wert = [Environment]::GetEnvironmentVariable("DEV_$($Name.ToUpperInvariant())")
     if ($wert) { $wert } else { Join-Path $Basis $Name }
 }
 $global:mdsVersion = [version](Import-PowerShellDataFile -LiteralPath (Join-Path $PSScriptRoot '../MdsTools.psd1')).ModuleVersion
-$global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path $HOME 'Dev' }
-$global:mdsRepos = Get-DevOrdner 'Repos' $mdsDev
-$global:mdsRoot = Get-DevOrdner 'Root' $mdsDev
+# 2026-11-03 Hubi/Claude: woy-Stand des Systems als Integer, getrennt von der Modulversion.
+#   Windows (MARS): 26 = aktueller woy-Stand (woyCode); macOS/Linux: 0 = kein woy.
+#   $mdsVersion ist dagegen auf allen Systemen gleich (Manifest).
+$global:mdsWoy = [int]$(if ($IsWindows) { 26 } else { 0 })
+# 2026-11-03 Hubi/Claude: Windows und macOS unterscheiden (wie xBase.BaseRoot).
+#   macOS/Linux: ~/Dev mit Unterordnern Repos/ und Root/ (Hierarchie)
+#   Windows:     feste Basis C:\woyCode; $mdsDev, $mdsRepos und $mdsRoot zeigen auf denselben
+#                Ordner, Bin/Config/... liegen direkt darunter (eine Verzeichnisebene)
+# DEV_<NAME> lenkt auf beiden Systemen weiterhin genau den Ordner <Name> um.
+$mdsWindowsBasis = 'C:\woyCode'
+if ($IsWindows) {
+    $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { $mdsWindowsBasis }
+    $global:mdsRepos = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $mdsDev }
+    $global:mdsRoot = if ($env:DEV_ROOT) { $env:DEV_ROOT } else { $mdsDev }
+}
+else {
+    $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path $HOME 'Dev' }
+    $global:mdsRepos = Get-DevOrdner 'Repos' $mdsDev
+    $global:mdsRoot = Get-DevOrdner 'Root' $mdsDev
+}
+Remove-Variable mdsWindowsBasis
 $global:mdsBin = Get-DevOrdner 'Bin' $mdsRoot
 $global:mdsConfig = Get-DevOrdner 'Config' $mdsRoot
 $global:mdsData = Get-DevOrdner 'Data' $mdsRoot

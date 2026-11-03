@@ -1,12 +1,14 @@
 #======================================================================
 # Datei:        Tools.ps1  (wird von MdsTools.psm1 dot-gesourct)
-# Beschreibung: Anzeigen und Aktualisieren von PowerShell 7 und .NET-SDK (Windows und macOS).
+# Beschreibung: Anzeigen und Aktualisieren von PowerShell 7 und .NET-SDK (Windows und macOS);
+#               Anzeige der mds-Variablen (Show-Mds).
 #
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Aus mdsPackage (SkriptModule\*.psm1) uebernommen,
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
+#   2026-11-03  Hubi/Claude  Show-Mds
 #
-# Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell
+# Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell, Show-Mds
 #======================================================================
 
 # [intern] Ermittelt die hoechste im winget-Repository verfuegbare Version eines Pakets.
@@ -443,5 +445,48 @@ function Show-PowerShell {
     Write-Host "  Version:    $netAktuell"
     if ($IsWindows) {
         Write-Host "  Verfügbar: $netVerfuegbar" -ForegroundColor $(if ($netVerfuegbar -gt $netAktuell) { 'Yellow' } else { 'Green' })
+    }
+}
+
+<#
+.SYNOPSIS
+    Zeigt die globalen mds-Variablen strukturiert an, inklusive Modulversion und woy-Stand.
+
+.DESCRIPTION
+    Liefert je Variable ein Objekt mit Wert, Quelle und (bei Ordnern) ob der Ordner existiert.
+    Quelle ist "DEV_<NAME>", wenn die Umgebungsvariable den Ordner umlenkt, sonst "Standard"
+    (macOS: ~/Dev-Hierarchie, Windows: C:\woyCode). Vorweg erscheint eine Kopfzeile mit Modul-,
+    PowerShell-Version und Betriebssystem.
+
+.EXAMPLE
+    Show-Mds
+
+.EXAMPLE
+    Show-Mds | Where-Object Vorhanden -eq $false
+#>
+# 2026-11-03 Hubi/Claude: erstellt
+function Show-Mds {
+    [CmdletBinding()]
+    param()
+
+    $os = if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
+    Write-Info "MdsTools $mdsVersion | woy $mdsWoy | PowerShell $($PSVersionTable.PSVersion) | $os"
+
+    [pscustomobject]@{ Variable = 'mdsVersion'; Wert = "$mdsVersion"; Quelle = 'MdsTools.psd1'; Vorhanden = $null }
+    [pscustomobject]@{ Variable = 'mdsWoy'; Wert = "$mdsWoy"; Quelle = $os; Vorhanden = $null }
+
+    $ordner = [ordered]@{
+        mdsDev = 'HOME'; mdsRepos = 'REPOS'; mdsRoot = 'ROOT'; mdsBin = 'BIN'
+        mdsConfig = 'CONFIG'; mdsData = 'DATA'; mdsLogs = 'LOGS'; mdsTemp = 'TEMP'
+    }
+    foreach ($eintrag in $ordner.GetEnumerator()) {
+        $wert = (Get-Variable -Name $eintrag.Key -Scope Global -ValueOnly -ErrorAction SilentlyContinue)
+        $env = "DEV_$($eintrag.Value)"
+        [pscustomobject]@{
+            Variable  = $eintrag.Key
+            Wert      = $wert
+            Quelle    = if ([Environment]::GetEnvironmentVariable($env)) { $env } else { 'Standard' }
+            Vorhanden = [bool]($wert -and (Test-Path -LiteralPath $wert -PathType Container))
+        }
     }
 }

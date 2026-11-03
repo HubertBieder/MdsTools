@@ -1,66 +1,140 @@
-# MDS-Development – Entwicklungsumgebung LUNA / MARS
+# MDS-Development – Systematik der Entwicklungsumgebung
 
-Stand: 31.10.2026 (Hubi / Claude)
+> **MDS** = **M**ulti **D**evelopment **S**ystem
+
+## Historie
+
+| Datum      | Version | Autor                | Änderung                                                                                              |
+| ---------- | ------- | -------------------- | ----------------------------------------------------------------------------------------------------- |
+| 2026-10-31 | 0.1     | Hubert Bieder/Claude | Erste Fassung (LUNA/MARS, `~/Dev`, Repos, Kurznamen)                                                  |
+| 2026-11-01 | 0.2     | Hubert Bieder/Claude | `DEV_<NAME>` lenkt genau den Ordner `<Name>` um (`DEV_HOME` = `~/Dev`)                                |
+| 2026-11-03 | 1.0     | Hubert Bieder/Claude | Neu gegliedert: nur Systematik; Windows flach unter `C:\woyCode`; `$mdsWoy`; Umsetzung in MdsTools.md |
+
+## Inhalt und Abgrenzung
+
+Dieses Dokument beschreibt die **Logik** der Entwicklungsumgebung: Systeme, PowerShell 7, Verzeichnisstruktur je
+Betriebssystem, Umlenkung per Umgebungsvariable, Repos und ihre Konventionen. Es gilt gleich für das
+PowerShell-Modul und für die C#-Klasse `xBase.BaseRoot` in NetCoreLib2026.
+
+Wie das Modul **MdsTools** diese Systematik umsetzt (Variablen `$mds*`, `go`, `mk`, `run`, `Show-Mds`, Cmdlets),
+steht in [MdsTools.md](MdsTools.md), dort auch die Auftragsabwicklung unter Windows. Eine Einführung in dieses Repo gibt [README.md](README.md).
 
 ## Ziel
 
 - Einheitliche, schlanke Entwicklungsumgebung auf **LUNA** (macOS) und **MARS** (Windows).
-- Schwerpunkt: C#-Entwicklung (WinForms, WPF, .NET MAUI, Services) unter macOS.
-- **Konventionen statt Konfiguration**: Die bisherige JSON-getriebene Modellierung (mdsPackage) wird abgelöst.
-- `woy` / `woyCode` ist Geschichte und wird nicht mehr verwendet.
+- Schwerpunkt: C#-Entwicklung (WinForms, WPF, .NET MAUI, Services), zusätzlich Python.
+- **Konventionen statt Konfiguration**: Die JSON-getriebene Modellierung von mdsPackage ist abgelöst.
+- Das alte Auftragsprogramm **woy** wird nicht weiterentwickelt. Unter Windows bleibt sein Ordner `C:\woyCode`
+  aber die Basis der Umgebung (siehe [Windows](#windows-mars-flach-unter-cwoycode)).
+
+## Systeme und PowerShell
+
+| System | Betriebssystem | Rolle                                      | woy-Stand (`$mdsWoy`) |
+| ------ | -------------- | ------------------------------------------ | --------------------- |
+| LUNA   | macOS          | Hauptentwicklung                           | `0`                   |
+| MARS   | Windows        | Windows-Programme, Auftragsabwicklung, IIS | `26`                  |
+
+- Nur **PowerShell 7**, mindestens **7.6**, auf beiden Systemen.
+- Unterschiede zwischen den Systemen werden ausschließlich über `$IsWindows` / `$IsMacOS` erkannt, nie über den
+  Rechnernamen.
+- Es gibt zwei getrennte Kennzahlen:
+  - **Modulversion** (`$mdsVersion`, z. B. `8.x`): Stand von MdsTools, auf allen Systemen **identisch**.
+  - **woy-Stand** (`$mdsWoy`, Integer): unterscheidet die Systeme. macOS `0` (kein woy), Windows `26`
+    (aktueller Stand von woyCode).
 
 ## Verzeichnisstruktur
 
-Ein einziger Anker im User-Ordner: `~/Dev` (Schreibweise immer genau so – Linux/HA-Server unterscheidet Groß-/Kleinschreibung).
+Es gibt genau drei Bereiche:
+
+| Bereich | Inhalt                                                                | Variable    |
+| ------- | --------------------------------------------------------------------- | ----------- |
+| Dev     | Einstiegspunkt; globale Verwaltungsskripte (CloneAll, PushAll, …)     | `$mdsDev`   |
+| Repos   | ausschließlich Git-Clones, jeder Unterordner = ein Repo (Kurzname)    | `$mdsRepos` |
+| Root    | Laufzeitumgebung `Bin`, `Config`, `Data`, `Logs`, `Temp` – nie in Git | `$mdsRoot`  |
+
+Wie die Bereiche auf der Platte liegen, unterscheidet sich zwischen macOS und Windows.
+
+### macOS (LUNA): Hierarchie unter `~/Dev`
+
+Ein einziger Anker im User-Ordner: `~/Dev` (Schreibweise immer genau so – Linux/HA-Server unterscheiden
+Groß-/Kleinschreibung).
 
 ```text
-~/Dev/
-   *.ps1        # globale Verwaltungsskripte (CloneAll, PushAll, …) – nicht in Git
-   Repos/       # ausschließlich Git-Clones, jeder Unterordner = ein Repo
-      Mds/      # MdsTools        (Nachfolger von mdsPackage)
-      Net/      # NetCoreLib2026
-      Maui/     # NetMauiApps
-      PHB/      # PythonHB
-   Root/        # Laufzeitumgebung – strikt getrennt von Repos, nie in Git
-      Bin/      # ausführbare Tools, gebaute CLIs/Services
-      Config/   # Einstellungen, Secrets
-      Data/     # Laufzeitdaten der Services (HA-MCP, REST-Dienste)
-      Logs/     # Protokolle der Skripte und Services
-      Temp/     # Zwischendateien, jederzeit löschbar
+~/Dev/                # $mdsDev   (/Users/hubert/Dev)
+   *.ps1              # globale Verwaltungsskripte – nicht in Git
+   Repos/             # $mdsRepos
+      Mds/            # MdsTools
+      Net/            # NetCoreLib2026
+      Maui/           # NetMauiApps
+      PHB/            # PythonHB
+   Root/              # $mdsRoot
+      Bin/            # ausführbare Tools, gebaute CLIs/Services (im PATH)
+      Config/         # Einstellungen, Secrets
+      Data/           # Laufzeitdaten der Services (HA-MCP, REST-Dienste)
+      Logs/           # Protokolle der Skripte und Services
+      Temp/           # Zwischendateien, jederzeit löschbar
 ```
 
-**Trennung ist Pflicht:**
+### Windows (MARS): flach unter `C:\woyCode`
 
-- `Repos/` enthält nur Quellcode (Git).
-- `Root/` enthält nur, was zur Laufzeit gebraucht oder erzeugt wird (Binaries, Konfiguration, Daten).
-- Kein Repo schreibt in seinen eigenen Ordner Konfiguration oder Daten, sondern immer nach `Root/`. Kein Inhalt von `Root/` wird eingecheckt.
-- Gesichert werden kann `Root/` unabhängig von den Repos (die liegen ja auf GitHub).
+Unter Windows stehen Dev, Repos und Root **nicht in einer Hierarchie, sondern auf einer Verzeichnisebene**. Die
+Basis ist fest `C:\woyCode`. `$mdsDev`, `$mdsRepos` und `$mdsRoot` gibt es trotzdem alle drei – sie zeigen auf
+denselben Ordner.
 
-| System         | Pfad                  |
-| -------------- | --------------------- |
-| LUNA (macOS)   | `/Users/hubert/Dev`   |
-| MARS (Windows) | `C:\Users\hubert\Dev` |
+```text
+C:\woyCode\           # $mdsDev = $mdsRepos = $mdsRoot
+   *.ps1              # globale Verwaltungsskripte
+   Mds\  Net\  Maui\  …   # Repos (Kurznamen)
+   Bin\  Config\  Data\  Logs\  Temp\   # Laufzeitordner
+```
 
-Beide liegen unter `$HOME`, damit bleibt die Skriptlogik identisch.
+Folgen der flachen Struktur:
+
+- `Bin`, `Config`, `Data`, `Logs` und `Temp` sind reservierte Namen und dürfen kein Repo-Kurzname sein.
+- Wer alle Repos braucht, darf nicht einfach alle Unterordner von `$mdsRepos` nehmen, sondern muss Repos erkennen
+  (z. B. an `.git` oder an `scripts/Make.ps1`).
+
+### Gegenüberstellung
+
+| Bereich              | macOS (LUNA)        | Windows (MARS)      |
+| -------------------- | ------------------- | ------------------- |
+| Dev                  | `/Users/hubert/Dev` | `C:\woyCode`        |
+| Repos                | `~/Dev/Repos`       | `C:\woyCode`        |
+| Root                 | `~/Dev/Root`        | `C:\woyCode`        |
+| Bin … Temp           | `~/Dev/Root/<Name>` | `C:\woyCode\<Name>` |
+| Basis abgeleitet aus | `$HOME`             | fest eingetragen    |
+
+### Trennung ist Pflicht
+
+- Repos enthalten nur Quellcode (Git).
+- Root enthält nur, was zur Laufzeit gebraucht oder erzeugt wird (Binaries, Konfiguration, Daten).
+- Kein Repo schreibt Konfiguration oder Daten in seinen eigenen Ordner, sondern immer nach Root.
+  Kein Inhalt von Root wird eingecheckt.
+- Root kann unabhängig von den Repos gesichert werden (die liegen auf GitHub).
 
 ### Umlenken per Umgebungsvariable
 
-Regel: **`DEV_<NAME>` zeigt genau auf den Ordner `<Name>`** – `DEV_HOME` (`~/Dev`), `DEV_REPOS`,
-`DEV_ROOT` (`~/Dev/Root`), `DEV_BIN`, `DEV_CONFIG`, `DEV_DATA`, `DEV_LOGS`, `DEV_TEMP`.
-Untergeordnete Ordner folgen mit. Gilt gleich für MdsTools (`$mds*`) und die C#-Klasse `xBase.BaseRoot`.
+Regel: **`DEV_<NAME>` zeigt genau auf den Ordner `<Name>`** – `DEV_HOME`, `DEV_REPOS`, `DEV_ROOT`, `DEV_BIN`,
+`DEV_CONFIG`, `DEV_DATA`, `DEV_LOGS`, `DEV_TEMP`. Untergeordnete Ordner folgen mit, sofern sie nicht selbst gesetzt
+sind (`DEV_ROOT` verschiebt auch `Bin`, `Config` …). Die Regel gilt auf beiden Systemen; ohne Umgebungsvariable
+gilt der Standard aus der Tabelle oben.
+
+> Bis 01.11.2026 stand `DEV_ROOT` für `~/Dev` (heute `DEV_HOME`).
 
 ## Repositories
 
 | Kurzname / Ordner | GitHub-Repo (HubertBieder) | Inhalt                                         |
 | ----------------- | -------------------------- | ---------------------------------------------- |
-| `Mds`             | **MdsTools** (neu)         | PowerShell-Modul zur Entwicklungsunterstützung |
+| `Mds`             | MdsTools                   | PowerShell-Modul zur Entwicklungsunterstützung |
 | `Net`             | NetCoreLib2026             | C#-Basisklassen, Services, CLIs                |
 | `Maui`            | NetMauiApps                | .NET-MAUI-Apps für alle Systeme                |
 | `PHB`             | PythonHB                   | Python                                         |
 
+Unter Windows liegen unter `C:\woyCode` zusätzlich die bestehenden woy-Repos.
+
 **Konvention:** Der Kurzname ist gleichzeitig
 
-- der lokale Ordnername unter `~/Dev/Repos`,
+- der lokale Ordnername unter Repos,
 - das Sprungziel für `go <Kurzname>`,
 - der Schlüssel in der Repo-Tabelle von CloneAll/PushAll.
 
@@ -81,73 +155,15 @@ git clone https://github.com/HubertBieder/NetCoreLib2026.git ~/Dev/Repos/Net
 Ein bestehender Ordner kann jederzeit umbenannt werden (vorher VS Code schließen). Danach Verweise prüfen:
 
 ```powershell
-Get-ChildItem ~/Dev/Repos -Recurse -Include *.csproj,*.sln,*.slnx,*.props,*.code-workspace |
+Get-ChildItem $mdsRepos -Recurse -Include *.csproj,*.sln,*.slnx,*.props,*.code-workspace |
     Select-String 'NetCoreLib' | Select-Object Path, LineNumber, Line
 ```
 
-## Modul MdsTools
-
-- Repo / Modul: **MdsTools**, lokaler Ordner: **Mds**
-- *mds* = **M**ulti**D**evelopment**S**ystem
-- Aufgaben: Erstellen und Verwalten von WinForms-, WPF-, MAUI- und Service-Projekten (Zielsprache C#), neue Projekte werden per PS-Skript erzeugt.
-- **Cmdlet-Namen bleiben gegenüber mdsPackage unverändert**, bis auf die Umbenennungen in `Repos/Mds/MdsTools.md`.
-- Das alte mdsPackage liegt vorerst noch unter `~/Dev/Repos/mdsPackage` und gehört nicht zur Struktur. Sobald MdsTools funktioniert, wird es entfernt.
-- Es darf **nicht parallel** geladen werden (gleiche Cmdlet-Namen → das zuletzt importierte Modul gewinnt). mdsPackage daher **nicht** in `PSModulePath` / `$PROFILE` aufnehmen.
-
-### Struktur (Vorschlag)
-
-PowerShell lädt Module nur automatisch, wenn Ordnername = Modulname. Deshalb liegt das Modul eine Ebene tiefer:
-
-```text
-~/Dev/Repos/Mds/
-   src/MdsTools/MdsTools.psd1
-   src/MdsTools/MdsTools.psm1
-   src/MdsTools/Public/       # exportierte Cmdlets
-   src/MdsTools/Private/
-   templates/                 # WinForms, WPF, MAUI, Service
-   tests/
-   README.md
-```
-
-In `$PROFILE`:
-
-```powershell
-$env:PSModulePath = (Join-Path $HOME 'dev/Repos/Mds/src') +
-    [IO.Path]::PathSeparator + $env:PSModulePath
-```
-
-## Zentrale Hilfsfunktionen
-
-```powershell
-# 2026-10-31 Hubi/Claude: zentrale Pfadauflösung unter ~/Dev
-#   Repos  -> ~/Dev/Repos
-#   Root   -> ~/Dev/Root
-#   Bin/Config/Data/Logs/Temp -> ~/Dev/Root/<Sub>
-# 2026-11-01 Hubi/Claude: DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_HOME = ~/Dev)
-function Get-DevPath {
-    param([ValidateSet('','Repos','Root','Bin','Config','Data','Logs','Temp')]
-          [string]$Sub = '')
-    $name = if ($Sub) { $Sub } else { 'Home' }
-    $wert = [Environment]::GetEnvironmentVariable("DEV_$($name.ToUpperInvariant())")
-    if ($wert) { return $wert }
-    switch ($Sub) {
-        ''      { Join-Path $HOME 'Dev' }
-        'Repos' { Join-Path (Get-DevPath) 'Repos' }
-        'Root'  { Join-Path (Get-DevPath) 'Root' }
-        default { Join-Path (Get-DevPath Root) $Sub }
-    }
-}
-
-# 2026-10-31 Hubi/Claude: in Repo-Ordner springen (go Net)
-function go {
-    param([Parameter(Mandatory)][string]$Name)
-    $p = Join-Path (Get-DevPath Repos) $Name
-    if (Test-Path $p) { Set-Location $p }
-    else { Write-Warning "Kein Repo '$Name' unter $(Get-DevPath Repos)" }
-}
-```
-
 ### Repo-Tabelle für CloneAll / PushAll
+
+Die globalen Skripte (`Skripte/` in diesem Repo, installiert nach `$mdsDev`) arbeiten mit einer Tabelle
+GitHub-Repo → Kurzname. Vorhandene Repos werden per `pull --ff-only` aktualisiert statt gelöscht; bei lokalen
+Änderungen bricht das Skript mit Warnung ab.
 
 ```powershell
 # 2026-10-31 Hubi/Claude: GitHub-Repo -> lokaler Kurzname
@@ -157,14 +173,23 @@ $Repos = [ordered]@{
     'NetMauiApps'    = 'Maui'
     'PythonHB'       = 'PHB'
 }
-foreach ($r in $Repos.GetEnumerator()) {
-    $target = Join-Path (Get-DevPath Repos) $r.Value
-    if (Test-Path (Join-Path $target '.git')) { git -C $target pull --ff-only }
-    else { git clone "https://github.com/HubertBieder/$($r.Key).git" $target }
-}
 ```
 
-Regeln aus dem bisherigen Stand bleiben: vorhandene Repos per `pull` aktualisieren statt löschen, bei lokalen Änderungen mit Warnung abbrechen, OS-Erkennung (`$IsWindows` / `$IsMacOS`), Versionierung per Kommentar (wann / wer / was).
+### Konventionen im Repo
+
+| Pfad im Repo          | Zweck                                                             | Aufruf       |
+| --------------------- | ----------------------------------------------------------------- | ------------ |
+| `scripts/Make.ps1`    | einziger Einstieg zum Bauen aller Programme des Repos             | `mk`         |
+| `scripts/Init.ps1`    | optional: vor dem Bauen (alle Programme/Gruppen)                  | über `mk`    |
+| `scripts/Post.ps1`    | optional: nach dem Bauen                                          | über `mk`    |
+| `scripts/_<Name>.ps1` | eigene Werkzeuge des Repos (z. B. Kopieren nach TEST-SRV/SQL-SRV) | `run <Name>` |
+| `.Log/`               | Protokolle der `mk`-Läufe (nicht in Git)                          | –            |
+
+Das Präfix `_` markiert ein Skript als Werkzeug für `run`. Details in [MdsTools.md](MdsTools.md#befehle).
+
+### Versionierung im Code
+
+Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03 Hubi/Claude: …`.
 
 ## Plattformhinweise
 
@@ -178,7 +203,8 @@ Regeln aus dem bisherigen Stand bleiben: vorhandene Repos per `pull` aktualisier
   Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' LongPathsEnabled 1
   ```
 
-- Visual Studio: Standard-Speicherort (`source\repos`) auf `~\Dev\Repos` umstellen.
+- Visual Studio: Standard-Speicherort (`source\repos`) auf `C:\woyCode` umstellen.
+- Die woy- und Auftrags-Funktionen (MdsSkripte) werden nur hier geladen.
 
 ### macOS (LUNA)
 
@@ -190,25 +216,16 @@ Regeln aus dem bisherigen Stand bleiben: vorhandene Repos per `pull` aktualisier
 
 - In pwsh: `Get-ChildItem -Force`.
 - Neuer Ordner im Finder: **⌘ ⇧ N**.
-- Hinweis: Der macOS-Spotlight-Dienst heißt ebenfalls `mds` – kein Konflikt, da kein Programm `mds` im PATH liegt.
+- Der macOS-Spotlight-Dienst heißt ebenfalls `mds` – kein Konflikt, da kein Programm `mds` im PATH liegt.
 
-## Allgemein
+### Allgemein
 
 - Repos **nicht** in iCloud/OneDrive ablegen (`.git`, `bin`, `obj`).
 - Groß-/Kleinschreibung der Ordner konsequent halten.
-
-## Bin in den PATH
-
-Damit Tools aus `Root/Bin` überall aufrufbar sind, in `$PROFILE`:
-
-```powershell
-$env:PATH = (Get-DevPath Bin) + [IO.Path]::PathSeparator + $env:PATH
-```
+- `Bin` steht im PATH, damit gebaute Tools überall aufrufbar sind (erledigt MdsTools beim Laden).
 
 ## Offene Punkte
 
-- Beschreibung des Moduls MdsTools (folgt).
-- Präfix der bestehenden Cmdlets prüfen und dokumentieren.
-- `go` mit Tab-Vervollständigung der Kurznamen.
-- CloneAll / PushAll auf `Get-DevPath` und Repo-Tabelle umstellen.
-- Altes Repo mdsPackage entfernen, sobald MdsTools funktioniert.
+- C#: Der Konstruktor von `xBase.BaseRoot` muss ohne Eingabe die Standards für Windows (`C:\woyCode`, flach) bzw.
+  macOS (`~/Dev`, Hierarchie) setzen; wird ein Pfad übergeben, werden die Ordner daraus abgeleitet.
+- Altes Repo mdsPackage entfernen, sobald MdsTools auf LUNA und MARS läuft.

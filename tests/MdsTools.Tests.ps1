@@ -13,6 +13,8 @@
     1.0.0    2026-10-31  Hubi/Claude   Erste Version
     1.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, Umlenkung DEV_REPOS/DEV_ROOT/DEV_CONFIG
     1.2.0    2026-11-02  Hubi/Claude   Invoke-Make: Gruppen, Init.ps1/Post.ps1, Logdatei; Schutz vor echtem mdsRepos
+    1.3.0    2026-11-03  Hubi/Claude   run: Skripte scripts/_<Name>.ps1, Liste
+    1.4.0    2026-11-03  Hubi/Claude   mdsWoy, Show-Mds
     1.2.1    2026-11-02  Hubi/Claude   Invoke-Make: Init.ps1/Post.ps1 nicht bei einzelnem Programm
 #>
 
@@ -65,14 +67,35 @@ Describe 'Modul' {
 Describe 'Globale Variablen und Root-Ordner' {
     It 'leitet alle Pfade aus DEV_HOME ab' {
         $mdsDev | Should -Be $env:DEV_HOME
-        $mdsRepos | Should -Be (Join-Path $mdsDev 'Repos')
-        $mdsRoot | Should -Be (Join-Path $mdsDev 'Root')
+        if ($IsWindows) {
+            # Windows: Repos und Root liegen auf derselben Ebene wie $mdsDev
+            $mdsRepos | Should -Be $mdsDev
+            $mdsRoot | Should -Be $mdsDev
+        }
+        else {
+            $mdsRepos | Should -Be (Join-Path $mdsDev 'Repos')
+            $mdsRoot | Should -Be (Join-Path $mdsDev 'Root')
+        }
         $mdsBin | Should -Be (Join-Path $mdsRoot 'Bin')
         $mdsTemp | Should -Be (Join-Path $mdsRoot 'Temp')
     }
 
     It 'legt die Root-Unterordner an' -ForEach @('Bin', 'Config', 'Data', 'Logs', 'Temp') {
         Join-Path $mdsRoot $_ | Should -Exist
+    }
+
+    It 'setzt mdsWoy als Integer (Windows 26, sonst 0)' {
+        $mdsWoy | Should -BeOfType [int]
+        $mdsWoy | Should -Be $(if ($IsWindows) { 26 } else { 0 })
+    }
+
+    It 'Show-Mds zeigt Version, woy und alle Ordner mit Quelle' {
+        $zeilen = Show-Mds 6>$null
+        $zeilen.Variable | Should -Be @('mdsVersion', 'mdsWoy', 'mdsDev', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp')
+        ($zeilen | Where-Object Variable -eq 'mdsVersion').Wert | Should -Be "$mdsVersion"
+        ($zeilen | Where-Object Variable -eq 'mdsDev').Quelle | Should -Be 'DEV_HOME'
+        ($zeilen | Where-Object Variable -eq 'mdsBin').Quelle | Should -Be 'Standard'
+        ($zeilen | Where-Object Variable -eq 'mdsBin').Vorhanden | Should -BeTrue
     }
 
     It 'lenkt Repos, Root und Config ueber DEV_REPOS, DEV_ROOT, DEV_CONFIG um' {
@@ -193,6 +216,57 @@ param([string] `$Programm = '', [string] `$OutDir = '', [switch] `$List, [switch
         try { $ausgabe = mk OhneMake 6>&1 | Out-String } finally { Pop-Location }
         $ausgabe | Should -Match 'Kein Repo'
         $script:protokoll | Should -Not -Exist
+    }
+}
+
+Describe 'run' {
+    BeforeAll {
+        # Test-Repo mit run-Skripten (_*.ps1) und einem Skript ohne Praefix, das nicht gelten darf
+        $script:runProtokoll = Join-Path $TestDrive 'run-aufruf.txt'
+        $scripts = Join-Path $mdsRepos 'Tools/scripts'
+        New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'Tools/src') -Force | Out-Null
+        New-Item -ItemType Directory -Path $scripts -Force | Out-Null
+        Set-Content -Path (Join-Path $scripts '_Copy.ps1') -Value @"
+param([string] `$Ziel = '', [switch] `$Force, [Parameter(ValueFromRemainingArguments)] `$Rest)
+"Z=`$Ziel|F=`$Force|R=`$Rest" | Set-Content '$($script:runProtokoll)'
+"@
+        Set-Content -Path (Join-Path $scripts '_Sql.ps1') -Value "'sql' | Set-Content '$($script:runProtokoll)'"
+        Set-Content -Path (Join-Path $scripts 'Intern.ps1') -Value "'intern' | Set-Content '$($script:runProtokoll)'"
+    }
+    BeforeEach { Remove-Item $script:runProtokoll -ErrorAction SilentlyContinue }
+
+    It 'fuehrt scripts/_<Skript>.ps1 des Repos aus und reicht benannte Argumente durch' {
+        Push-Location $TestDrive
+        try { run tools copy -Ziel TEST-SRV -Force } finally { Pop-Location }
+        Get-Content $script:runProtokoll | Should -Be 'Z=TEST-SRV|F=True|R='
+    }
+
+    It 'nimmt im Repo-Ordner den ersten Parameter als Skript (auch aus Unterordnern)' {
+        Push-Location (Join-Path $mdsRepos 'Tools/src')
+        try { run Copy SQL-SRV } finally { Pop-Location }
+        Get-Content $script:runProtokoll | Should -Be 'Z=SQL-SRV|F=False|R='
+    }
+
+    It 'listet nur Skripte mit Praefix _ (ohne Praefix, ohne .ps1)' {
+        Push-Location (Join-Path $mdsRepos 'Tools')
+        try { $ausgabe = run -List 6>&1 | Out-String } finally { Pop-Location }
+        $ausgabe | Should -Match 'Copy, Sql'
+        $ausgabe | Should -Not -Match 'Intern'
+        $script:runProtokoll | Should -Not -Exist
+    }
+
+    It 'listet ausserhalb der Repos alle Repos mit ihren Skripten' {
+        Push-Location $TestDrive
+        try { $ausgabe = run 6>&1 | Out-String } finally { Pop-Location }
+        $ausgabe | Should -Match 'Tools: Copy, Sql'
+        $ausgabe | Should -Not -Match 'Net:'
+    }
+
+    It 'fuehrt ein Skript ohne Praefix nicht aus' {
+        Push-Location (Join-Path $mdsRepos 'Tools')
+        try { $ausgabe = run Intern 6>&1 | Out-String } finally { Pop-Location }
+        $ausgabe | Should -Match "Kein Skript '_Intern.ps1'"
+        $script:runProtokoll | Should -Not -Exist
     }
 }
 

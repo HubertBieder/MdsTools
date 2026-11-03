@@ -3,6 +3,7 @@
 #
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Erstellt, Version 8.0.0 (E1)
+#   2026-11-03  Hubi/Claude  run und Show-Mds exportiert
 #
 @{
     RootModule        = 'MdsTools.psm1'
@@ -13,7 +14,7 @@
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'
     Copyright         = '(c) 2015..2026 H.Bieder. Alle Rechte vorbehalten.'
-    Description       = 'MDS (Multi Development System): Bauen und Veroeffentlichen von C#-Projekten, Datei-, ZIP- und Freigabe-Hilfen, Werkzeug-Updates sowie go/mk fuer macOS und Windows.'
+    Description       = 'MDS (Multi Development System): Bauen und Veroeffentlichen von C#-Projekten, Datei-, ZIP- und Freigabe-Hilfen, Werkzeug-Updates sowie go/mk/run fuer macOS und Windows.'
 
     # Nur PowerShell 7, mindestens 7.6 (A1)
     PowerShellVersion = '7.6'
@@ -29,8 +30,8 @@
         'Backup-Develop', 'Get-OneDriveRoot',                                          # FileIO.ps1
         'Copy-FileWithCredential', 'Copy-FolderWithCredential',                        # Share.ps1
         'Copy-ToZip', 'Copy-FileToZip', 'Export-FromZip', 'Get-ZipEntry',              # Zip.ps1
-        'Update-DotNet', 'Update-PowerShell', 'Show-PowerShell',                       # Tools.ps1
-        'go', 'mk'                                                                     # Navigation.ps1
+        'Update-DotNet', 'Update-PowerShell', 'Show-PowerShell', 'Show-Mds',           # Tools.ps1
+        'go', 'mk', 'run'                                                              # Navigation.ps1
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
