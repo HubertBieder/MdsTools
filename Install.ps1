@@ -7,7 +7,7 @@
     Laeuft unter PowerShell 7.6+ auf Windows (MARS) und macOS (LUNA).
       1. Modul/MdsTools      -> Benutzer-Modulordner (vorhandene Version wird ersetzt)
       2. Profile/profile.ps1 -> $PROFILE.CurrentUserAllHosts (vorher Sicherung *.bak)
-      3. Skripte/*.ps1       -> $mdsDev (nur wenn neuer); veraltete Skripte werden entfernt
+      3. Modul/Skripte/*.ps1 -> $mdsDev (nur wenn neuer); veraltete Skripte werden entfernt
       4. nur Windows: ~/.woy/woy.env einrichten (woy-Anmeldedaten)
     Ist mdsPackage noch installiert, bricht das Skript ab: erst Uninstall.ps1 ausfuehren.
 
@@ -18,11 +18,13 @@
     Version  Datum       Wer           Was
     5.1                  H. Bieder     Installation mdsPackage
     6.0.0    2026-10-31  Hubi/Claude   Umstellung auf MdsTools (MdsTools.md, Schritt 5)
+    6.1.0    2026-11-04  Hubi/Claude   Globale Skripte aus Modul/Skripte; Kopf-/Schlusszeile mit Modulversion
 #>
 [CmdletBinding()]
 param()
 
-$ScriptVersion = '6.0.0'
+# Angezeigt wird die Modulversion aus dem Manifest im Repo (einzige Versionsnummer, A2).
+$ModulVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'Modul/MdsTools/MdsTools.psd1')).ModuleVersion
 
 # Repo-Wurzel = Ordner dieses Skripts (unabhaengig vom aktuellen Verzeichnis).
 $script:RepoRoot = $PSScriptRoot
@@ -84,7 +86,7 @@ function Copy-Profile() {
 # Kopiert die globalen Skripte nach $DevDir, wenn sie dort fehlen oder aelter sind,
 # und entfernt die nicht mehr gepflegten Skripte aus $script:ObsoleteScripts.
 function Copy-GlobalScripts([string] $DevDir) {
-    foreach ($skript in Get-ChildItem -LiteralPath (Join-Path $script:RepoRoot 'Skripte') -Filter '*.ps1' -File) {
+    foreach ($skript in Get-ChildItem -LiteralPath (Join-Path $script:RepoRoot 'Modul/Skripte') -Filter '*.ps1' -File) {
         $target = Join-Path $DevDir $skript.Name
         if ((Test-Path -LiteralPath $target -PathType Leaf) -and
             ((Get-Item -LiteralPath $target).LastWriteTimeUtc -ge $skript.LastWriteTimeUtc)) {
@@ -148,7 +150,7 @@ function Install-WoyEnv() {
     }
 }
 
-Write-Host "================= MdsTools installieren ==========================  V$ScriptVersion  ====="
+Write-Host "================= MdsTools installieren ==========================  V$ModulVersion  ====="
 if (-not (Assert-NoMdsPackage)) {
     return
 }
@@ -166,7 +168,7 @@ if ($IsWindows) {
 }
 
 Write-Host ""
-Write-Host "================= MdsTools installiert ===========================  V$ScriptVersion  ====="
+Write-Host "================= MdsTools installiert ===========================  V$ModulVersion  ====="
 Write-Host ""
 $modul = Get-Module MdsTools
 Write-Host "Modul:        MdsTools $($modul.Version)  ($($modul.ModuleBase))"

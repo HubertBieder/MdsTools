@@ -29,13 +29,14 @@
     3.1.0    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT, DEV_REPOS
     3.2.0    2026-11-03  Hubi/Claude   Windows: Repos direkt in C:\woyCode statt C:\woyCode\Repos;
                                        Zielverzeichnis am Ende ausgeben
+    3.3.0    2026-11-04  Hubi/Claude   Im Repo unter Modul/Skripte (statt Skripte)
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.2.0'
+$ScriptVersion = '3.3.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -54,8 +55,8 @@ $hostName  = [System.Net.Dns]::GetHostName()
 
 # --- Dev und Repos bestimmen (gleiche Logik wie InitModule.ps1 in MdsTools).
 #     Windows: feste Basis C:\woyCode, Repos direkt darin (eine Ebene).
-#     macOS/Linux: Ordner des Skripts (~/Dev); laeuft es direkt aus dem Repo (Repos/Mds/Skripte),
-#     drei Ebenen nach oben; Repos in Dev/Repos.
+#     macOS/Linux: Ordner des Skripts (~/Dev); laeuft es direkt aus dem Repo (Repos/Mds/Modul/Skripte),
+#     vier Ebenen nach oben; Repos in Dev/Repos.
 #     $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
 if ($onWindows) {
     $DevDir = if ($env:DEV_HOME) { $env:DEV_HOME } else { 'C:\woyCode' }
@@ -63,8 +64,10 @@ if ($onWindows) {
 }
 else {
     $DevDir = $PSScriptRoot
-    if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Leaf) -eq 'Repos') {
-        $DevDir = Split-Path (Split-Path (Split-Path $DevDir -Parent) -Parent) -Parent
+    # 2026-11-04 Hubi/Claude: Skripte liegen im Repo unter Modul/Skripte (Repos/Mds/Modul/Skripte)
+    $repoDir = Split-Path (Split-Path $DevDir -Parent) -Parent
+    if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path $repoDir -Parent) -Leaf) -eq 'Repos') {
+        $DevDir = Split-Path (Split-Path $repoDir -Parent) -Parent
     }
     if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
     $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }

@@ -9,6 +9,8 @@
 #   2026-11-03  Hubi/Claude  run: Skripte mit Praefix _ in scripts/ ausfuehren und auflisten
 #   2026-11-03  Hubi/Claude  go repos (unter Windows gleich go dev = C:\woyCode)
 #   2026-11-03  Hubi/Claude  go: nur Ordner mit .git (keine Laufzeitordner unter C:\woyCode)
+#   2026-11-04  Hubi/Claude  run: globale Skripte aus Mds/scripts, eindeutige Abkuerzung (run back)
+#   2026-11-04  Hubi/Claude  Show-Repos: Repos mit GitHub-Name, letzter Aenderung, Kurzbeschreibung
 #
 # Oeffentlich: go, mk, run
 #======================================================================
@@ -173,6 +175,18 @@ function Get-RunScript([string]$Repo) {
         ForEach-Object { $_.BaseName.Substring(1) } | Where-Object { $_ } | Sort-Object
 }
 
+# [intern] Sucht ein run-Skript: zuerst exakt, sonst eindeutige Abkuerzung (back -> backup).
+# Gross-/Kleinschreibung spielt keine Rolle. Rueckgabewert: alle Treffer (genau einer = eindeutig).
+# 2026-11-04 Hubi/Claude: erstellt
+function Find-RunScript([string[]] $Skripte, [string] $Skript) {
+    $exakt = @($Skripte | Where-Object { $_ -eq $Skript })
+    if ($exakt) { return $exakt[0] }
+    return @($Skripte | Where-Object { $_ -like "$([WildcardPattern]::Escape($Skript))*" })
+}
+
+# Repo mit den globalen run-Skripten (scripts/_*.ps1), die von ueberall gelten: run backup.
+$script:RunGlobalRepo = 'Mds'
+
 # [intern] Repos unter $mdsRepos mit mindestens einem run-Skript (scripts/_*.ps1).
 function Get-RunRepo {
     Get-ChildItem -LiteralPath $mdsRepos -Directory -ErrorAction SilentlyContinue |
@@ -187,14 +201,19 @@ function Get-RunRepo {
 #   run <Repo>                  Skripte des Repos anzeigen
 #   run <Repo> <Skript> [...]   scripts/_<Skript>.ps1 des Repos ausfuehren
 #   run [<Repo>] -List          verfuegbare Skripte anzeigen
+# Fehlt das Skript im aktuellen Repo (oder steht man ausserhalb der Repos), gilt Mds/scripts
+# (globale Skripte, z. B. run backup). Eine eindeutige Abkuerzung genuegt (run back).
 # Alle weiteren Argumente (auch benannte wie -Ziel TEST-SRV) gehen unveraendert an das Skript.
 # Bewusst eine einfache Funktion (kein [CmdletBinding()]), damit $args die benannten Argumente behaelt.
 # 2026-11-03 Hubi/Claude: erstellt
+# 2026-11-04 Hubi/Claude: globale Skripte aus Mds/scripts, Abkuerzungen
 function run([string] $Skript = "", [switch] $List) {
     $repos = @(Get-RunRepo)
     $aktuell = Get-CurrentRepo $repos
     $weiter = @($args)
+    $global = $repos | Where-Object { $_ -eq $script:RunGlobalRepo } | Select-Object -First 1
     $treffer = $repos | Where-Object { $_ -eq $Skript } | Select-Object -First 1
+    $explizit = [bool]$treffer
     if ($treffer) {
         # Erster Parameter ist ein Repo, der naechste (sofern kein -Schalter) das Skript
         $Skript = ""
@@ -205,6 +224,10 @@ function run([string] $Skript = "", [switch] $List) {
     }
     elseif ($aktuell) {
         $treffer = $aktuell
+    }
+    elseif ($Skript -and $global) {
+        # Ausserhalb der Repos (z. B. in Dev): globale Skripte
+        $treffer = $global
     }
     elseif ($Skript) {
         Write-Fail "Kein Repo '$Skript' mit Skripten scripts/_*.ps1. Gültig: $($repos -join ', ')"
@@ -225,11 +248,25 @@ function run([string] $Skript = "", [switch] $List) {
         Write-Info "Skripte in $treffer/scripts (run <Skript>): $($skripte -join ', ')"
         return
     }
-    $name = $skripte | Where-Object { $_ -eq $Skript } | Select-Object -First 1
-    if (-not $name) {
+    $namen = @(Find-RunScript $skripte $Skript)
+    if ($namen.Count -eq 0 -and -not $explizit -and $global -and $treffer -ne $global) {
+        # Nicht im aktuellen Repo: globales Skript aus Mds/scripts
+        $globaleNamen = @(Find-RunScript @(Get-RunScript $global) $Skript)
+        if ($globaleNamen.Count -gt 0) {
+            $treffer = $global
+            $namen = $globaleNamen
+            $skripte = @(Get-RunScript $global)
+        }
+    }
+    if ($namen.Count -gt 1) {
+        Write-Fail "Skript '$Skript' ist nicht eindeutig in $treffer/scripts: $($namen -join ', ')"
+        return
+    }
+    if ($namen.Count -eq 0) {
         Write-Fail "Kein Skript '_$Skript.ps1' in $treffer/scripts. Gültig: $($skripte -join ', ')"
         return
     }
+    $name = $namen[0]
     $pfad = Join-Path (Join-Path (Join-Path $mdsRepos $treffer) 'scripts') "_$name.ps1"
     & $pfad @weiter
 }
@@ -238,7 +275,107 @@ Register-ArgumentCompleter -CommandName run -ParameterName Skript -ScriptBlock {
     param($commandName, $parameterName, $wordToComplete)
     $repos = @(Get-RunRepo)
     $aktuell = Get-CurrentRepo $repos
-    $ziele = @(if ($aktuell) { Get-RunScript $aktuell }) + $repos
+    $global = $repos | Where-Object { $_ -eq $script:RunGlobalRepo } | Select-Object -First 1
+    $ziele = @(if ($aktuell) { Get-RunScript $aktuell }) + @(if ($global) { Get-RunScript $global }) + $repos
     $ziele | Select-Object -Unique | Where-Object { $_ -like "$wordToComplete*" } |
         ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
+}
+
+# [intern] Kurzbeschreibung eines Repos aus der ersten Zeile der README.md: "# <Name> – <Beschreibung>".
+# Fehlt der Teil nach dem Gedankenstrich, gilt die erste Textzeile nach der Ueberschrift.
+# Laenger als 80 Zeichen wird mit "…" gekuerzt. Rueckgabewert: Text oder "".
+# 2026-11-04 Hubi/Claude: erstellt fuer Show-Repos
+function Get-RepoDescription([string] $Pfad) {
+    $readme = Get-ChildItem -LiteralPath $Pfad -File -Filter 'README.md' -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $readme) { return '' }
+    $zeilen = @(Get-Content -LiteralPath $readme.FullName -TotalCount 40 -Encoding utf8 |
+        ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if (-not $zeilen) { return '' }
+    $text = ''
+    if ($zeilen[0] -match '^#\s+.+?\s+[–-]\s+(.+)$') {
+        $text = $Matches[1]
+    }
+    else {
+        # Erste Zeile, die keine Ueberschrift, kein Zitat, keine Tabelle, Liste oder Codeblock ist
+        $text = $zeilen | Select-Object -Skip 1 |
+            Where-Object { $_ -notmatch '^(#|>|\||-|\*|```|<)' } | Select-Object -First 1
+    }
+    $text = "$text".Trim()
+    if ($text.Length -gt 80) { $text = $text.Substring(0, 79).TrimEnd() + '…' }
+    return $text
+}
+
+# [intern] Stand des Branches gegenueber seinem Upstream (ohne fetch): "aktuell", "vor 2", "zurueck 1",
+# "vor 2 / zurueck 1" oder "kein Upstream".
+# 2026-11-04 Hubi/Claude: erstellt fuer Show-Repos -Full
+function Get-RepoSyncState([string] $Pfad) {
+    $zahlen = git -C $Pfad rev-list --left-right --count '@{u}...HEAD' 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $zahlen) { return 'kein Upstream' }
+    $zurueck, $vor = "$zahlen" -split '\s+' | ForEach-Object { [int]$_ }
+    $teile = @()
+    if ($vor -gt 0) { $teile += "vor $vor" }
+    if ($zurueck -gt 0) { $teile += "zurueck $zurueck" }
+    if (-not $teile) { return 'aktuell' }
+    return $teile -join ' / '
+}
+
+<#
+.SYNOPSIS
+    Listet alle Repos unter $mdsRepos mit GitHub-Name, letzter Aenderung und Kurzbeschreibung.
+
+.DESCRIPTION
+    Je Repo (Ordner mit .git) ein Objekt:
+      Name          Ordnername (Kurzname), z. B. Mds
+      Repo          GitHub-Name aus der Remote-URL origin, z. B. MdsTools
+      Datum         Datum des letzten Commits (yyyy-MM-dd HH:mm, Ortszeit)
+      Geändert      $true, wenn es nicht committete Aenderungen gibt (git status)
+      Beschreibung  erste Zeile der README.md "# <Name> – <Beschreibung>" (max. 80 Zeichen)
+    Mit -Full (-F) zusaetzlich Branch, Stand gegenueber dem Upstream (ohne fetch) und Remote-URL.
+
+.EXAMPLE
+    Show-Repos
+
+.EXAMPLE
+    Show-Repos -F
+
+.EXAMPLE
+    Show-Repos | Where-Object Geändert
+#>
+# 2026-11-04 Hubi/Claude: erstellt
+function Show-Repos {
+    [CmdletBinding()]
+    param(
+        [Alias('F')]
+        [switch] $Full
+    )
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Fail 'git ist nicht installiert oder nicht im PATH.'
+        return
+    }
+    $ordner = Get-ChildItem -LiteralPath $mdsRepos -Directory -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '.git') } | Sort-Object Name
+    if (-not $ordner) {
+        Write-Info "Keine Repos unter $mdsRepos."
+        return
+    }
+    foreach ($repo in $ordner) {
+        $pfad = $repo.FullName
+        $url = git -C $pfad remote get-url origin 2>$null
+        $iso = git -C $pfad log -1 --format=%cI 2>$null
+        $zeile = [ordered]@{
+            Name         = $repo.Name
+            Repo         = if ($url) { (("$url" -replace '\.git$', '').TrimEnd('/') -split '[/:]')[-1] } else { '' }
+            Datum        = if ($iso) { ([datetimeoffset]::Parse("$iso")).LocalDateTime.ToString('yyyy-MM-dd HH:mm') } else { '' }
+            'Geändert'   = [bool](git -C $pfad status --porcelain 2>$null)
+            Beschreibung = Get-RepoDescription $pfad
+        }
+        if ($Full) {
+            $zeile.Branch = "$(git -C $pfad branch --show-current 2>$null)"
+            $zeile.Stand = Get-RepoSyncState $pfad
+            $zeile.Remote = "$url"
+        }
+        [pscustomobject]$zeile
+    }
 }

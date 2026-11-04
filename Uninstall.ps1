@@ -27,13 +27,15 @@
     Version  Datum       Wer           Was
     1.0.0    2026-10-31  Hubi/Claude   Erste Version (MdsTools.md, Schritt 6)
     1.0.1    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT
+    1.1.0    2026-11-04  Hubi/Claude   Kopf-/Schlusszeile mit Modulversion
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [switch] $KeepMdsTools
 )
 
-$ScriptVersion = '1.0.1'
+# Angezeigt wird die Modulversion aus dem Manifest im Repo (einzige Versionsnummer, A2).
+$ModulVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'Modul/MdsTools/MdsTools.psd1')).ModuleVersion
 
 # Gemeinsame Pfad-Helfer: Get-UserHome, Get-ProfileRoot, Get-CurrentUserModuleDir
 . (Join-Path $PSScriptRoot 'InstallHelper.ps1')
@@ -56,7 +58,7 @@ function Move-ToBackup {
     Write-Host -ForegroundColor DarkYellow "Gesichert und entfernt: $Path"
 }
 
-Write-Host "================= mdsPackage/MdsTools entfernen ==================  V$ScriptVersion  ====="
+Write-Host "================= mdsPackage/MdsTools entfernen ==================  V$ModulVersion  ====="
 
 # 1. Aus der Sitzung entladen
 Remove-Module -Name $moduleNames -Force -ErrorAction SilentlyContinue
@@ -104,7 +106,7 @@ if (Test-Path -LiteralPath $profileFile -PathType Leaf) {
 }
 
 Write-Host ""
-Write-Host "================= entfernt =======================================  V$ScriptVersion  ====="
+Write-Host "================= entfernt =======================================  V$ModulVersion  ====="
 Write-Host "Modulordner entfernt: $removed"
 if (Test-Path -LiteralPath $backupDir) {
     Write-Host "Sicherung:            $backupDir"

@@ -6,12 +6,14 @@
 #   2026-11-03  Hubi/Claude  run und Show-Mds exportiert
 #   2026-11-03  Hubi/Claude  8.2.0: Anpassen an Windows (Keep fuer Clear-BinFolder/Invoke-Make),
 #                            JSON-Verfahren (*.mds) wird nicht mehr unterstuetzt
+#   2026-11-04  Hubi/Claude  8.2.1: Show-Mds -Full, globale Skripte unter Modul/Skripte
+#   2026-11-04  Hubi/Claude  8.2.2: Show-Repos
 #
 @{
     RootModule        = 'MdsTools.psm1'
 
     # Einzige Stelle fuer die Modulversion (A2); $mdsVersion liest sie aus.
-    ModuleVersion     = '8.2.0'
+    ModuleVersion     = '8.2.2'
 
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'
@@ -33,7 +35,7 @@
         'Copy-FileWithCredential', 'Copy-FolderWithCredential',                        # Share.ps1
         'Copy-ToZip', 'Copy-FileToZip', 'Export-FromZip', 'Get-ZipEntry',              # Zip.ps1
         'Update-DotNet', 'Update-PowerShell', 'Show-PowerShell', 'Show-Mds',           # Tools.ps1
-        'go', 'mk', 'run'                                                              # Navigation.ps1
+        'go', 'mk', 'run', 'Show-Repos'                                                # Navigation.ps1
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

@@ -181,7 +181,7 @@ Get-ChildItem $mdsRepos -Recurse -Include *.csproj,*.sln,*.slnx,*.props,*.code-w
 
 ### Repo-Tabelle für CloneAll / PushAll
 
-Die globalen Skripte (`Skripte/` in diesem Repo, installiert nach `$mdsDev`) arbeiten mit einer Tabelle
+Die globalen Skripte (`Modul/Skripte/` in diesem Repo, installiert nach `$mdsDev`) arbeiten mit einer Tabelle
 GitHub-Repo → Kurzname. Vorhandene Repos werden per `pull --ff-only` aktualisiert statt gelöscht; bei lokalen
 Änderungen bricht das Skript mit Warnung ab.
 

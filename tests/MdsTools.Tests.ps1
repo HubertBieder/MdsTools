@@ -18,6 +18,9 @@
     1.2.1    2026-11-02  Hubi/Claude   Invoke-Make: Init.ps1/Post.ps1 nicht bei einzelnem Programm
     1.5.0    2026-11-03  Hubi/Claude   Clear-BinFolder -Keep, Invoke-Make Schluessel Keep (8.2)
     1.5.1    2026-11-03  Hubi/Claude   Backup-Develop: Rueckgabe Pfad/$null
+    1.6.0    2026-11-04  Hubi/Claude   Show-Mds -Full
+    1.7.0    2026-11-04  Hubi/Claude   run: globale Skripte aus Mds/scripts, Abkuerzungen
+    1.8.0    2026-11-04  Hubi/Claude   Show-Repos
 #>
 
 BeforeAll {
@@ -105,6 +108,17 @@ Describe 'Globale Variablen und Root-Ordner' {
         ($zeilen | Where-Object Variable -eq 'mdsDev').Quelle | Should -Be 'DEV_HOME'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Quelle | Should -Be 'Standard'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Vorhanden | Should -BeTrue
+    }
+
+    It 'Show-Mds -Full (-F) zeigt zusaetzlich alle exportierten Befehle mit Beschreibung und Datei' {
+        $basis = @(Show-Mds 6>$null)
+        $zeilen = @(Show-Mds -F 6>$null)
+        $befehle = $zeilen | Select-Object -Skip $basis.Count
+        $export = (Get-Module MdsTools).ExportedFunctions.Keys
+        foreach ($name in $export) { $befehle.Variable | Should -Contain $name }
+        ($befehle | Where-Object Variable -eq 'go').Quelle | Should -Be 'Navigation.ps1'
+        ($befehle | Where-Object Variable -eq 'Write-Info').Wert | Should -Be 'Gibt eine Info-Statuszeile aus.'
+        ($befehle | Where-Object Variable -eq 'Show-Mds').Wert | Should -Match '^Zeigt die globalen mds-Variablen'
     }
 
     It 'lenkt Repos, Root und Config ueber DEV_REPOS, DEV_ROOT, DEV_CONFIG um' {
@@ -288,6 +302,90 @@ param([string] `$Ziel = '', [switch] `$Force, [Parameter(ValueFromRemainingArgum
         try { $ausgabe = run Intern 6>&1 | Out-String } finally { Pop-Location }
         $ausgabe | Should -Match "Kein Skript '_Intern.ps1'"
         $script:runProtokoll | Should -Not -Exist
+    }
+}
+
+Describe 'run (globale Skripte aus Mds/scripts)' {
+    BeforeAll {
+        $script:runProtokoll = Join-Path $TestDrive 'run-global.txt'
+        $mds = Join-Path $mdsRepos 'Mds/scripts'
+        $eigen = Join-Path $mdsRepos 'Eigen/scripts'
+        New-Item -ItemType Directory -Path $mds, $eigen, (Join-Path $mdsRepos 'Eigen/src') -Force | Out-Null
+        Set-Content -Path (Join-Path $mds '_backup.ps1') -Value @"
+[CmdletBinding()] param([string] `$Repo = '', [switch] `$Force)
+"B=`$Repo|F=`$Force|V=`$(`$PSBoundParameters['Verbose'] -eq `$true)|O=`$((Get-Location).Path)" | Set-Content '$($script:runProtokoll)'
+"@
+        Set-Content -Path (Join-Path $mds '_bauen.ps1') -Value "'bauen' | Set-Content '$($script:runProtokoll)'"
+        Set-Content -Path (Join-Path $eigen '_copy.ps1') -Value "'copy' | Set-Content '$($script:runProtokoll)'"
+    }
+    BeforeEach { Remove-Item $script:runProtokoll -ErrorAction SilentlyContinue }
+
+    It 'fuehrt ausserhalb der Repos das globale Skript mit Abkuerzung aus und reicht Argumente durch' {
+        Push-Location $TestDrive
+        try { run back Net -Force -Verbose } finally { Pop-Location }
+        Get-Content $script:runProtokoll | Should -BeLike 'B=Net|F=True|V=True|O=*'
+    }
+
+    It 'nimmt im Repo ohne eigenes Skript das globale (aktueller Ordner bleibt)' {
+        Push-Location (Join-Path $mdsRepos 'Eigen/src')
+        try { run backup } finally { Pop-Location }
+        Get-Content $script:runProtokoll | Should -Be "B=|F=False|V=False|O=$(Join-Path $mdsRepos 'Eigen/src')"
+    }
+
+    It 'bevorzugt das Skript des aktuellen Repos' {
+        Push-Location (Join-Path $mdsRepos 'Eigen')
+        try { run co } finally { Pop-Location }
+        Get-Content $script:runProtokoll | Should -Be 'copy'
+    }
+
+    It 'meldet eine mehrdeutige Abkuerzung' {
+        Push-Location $TestDrive
+        try { $ausgabe = run ba 6>&1 | Out-String } finally { Pop-Location }
+        $ausgabe | Should -Match 'nicht eindeutig'
+        $script:runProtokoll | Should -Not -Exist
+    }
+}
+
+Describe 'Show-Repos' {
+    BeforeAll {
+        # Zwei Git-Repos: eines mit "# Name – Beschreibung", eines mit Beschreibung in der Zeile danach
+        $script:repoA = Join-Path $mdsRepos 'Alpha'
+        $script:repoB = Join-Path $mdsRepos 'Beta'
+        New-Item -ItemType Directory -Path (Join-Path $mdsRepos 'OhneGit') -Force | Out-Null
+        foreach ($r in $script:repoA, $script:repoB) {
+            New-Item -ItemType Directory -Path $r -Force | Out-Null
+            git -C $r init -q -b main 2>$null
+        }
+        Set-Content (Join-Path $script:repoA 'README.md') "# Alpha – Kurzbeschreibung Alpha`n`nText" -Encoding utf8
+        Set-Content (Join-Path $script:repoB 'README.md') "# Beta`n`n> Zitat`n`nZweite Zeile gilt $('x' * 90)" -Encoding utf8
+        git -C $script:repoA remote add origin 'https://github.com/Test/AlphaRepo.git'
+        foreach ($r in $script:repoA, $script:repoB) {
+            git -C $r add -A
+            git -C $r -c user.name=Test -c user.email=test@example.invalid commit -q -m 'Start' 2>$null
+        }
+        Set-Content (Join-Path $script:repoB 'neu.txt') 'offen'
+    }
+
+    It 'listet nur Ordner mit .git, mit Repo-Name, Datum, Geändert und Beschreibung' {
+        $zeilen = @(Show-Repos | Where-Object Name -in 'Alpha', 'Beta', 'OhneGit')
+        $zeilen.Name | Should -Be @('Alpha', 'Beta')
+        $a = $zeilen | Where-Object Name -eq 'Alpha'
+        $a.Repo | Should -Be 'AlphaRepo'
+        $a.Datum | Should -Match '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$'
+        $a.'Geändert' | Should -BeFalse
+        $a.Beschreibung | Should -Be 'Kurzbeschreibung Alpha'
+        $b = $zeilen | Where-Object Name -eq 'Beta'
+        $b.Repo | Should -Be ''
+        $b.'Geändert' | Should -BeTrue
+        $b.Beschreibung.Length | Should -Be 80
+        $b.Beschreibung | Should -BeLike 'Zweite Zeile gilt x*…'
+    }
+
+    It 'zeigt mit -F zusaetzlich Branch, Stand und Remote' {
+        $a = Show-Repos -F | Where-Object Name -eq 'Alpha'
+        $a.Branch | Should -Be 'main'
+        $a.Stand | Should -Be 'kein Upstream'
+        $a.Remote | Should -Be 'https://github.com/Test/AlphaRepo.git'
     }
 }
 

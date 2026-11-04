@@ -8,6 +8,7 @@
 #                            Cmdlets umbenannt (siehe MdsTools.md, Umbenennungen)
 #   2026-11-03  Hubi/Claude  Show-Mds
 #   2026-11-03  Hubi/Claude  Show-Mds: Zeile System, Windows-Zeilen mdsWoySrc/Bin/Run
+#   2026-11-04  Hubi/Claude  Show-Mds -Full (-F): zusaetzlich alle externen Befehle
 #
 # Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell, Show-Mds
 #======================================================================
@@ -459,8 +460,16 @@ function Show-PowerShell {
     (macOS: ~/Dev-Hierarchie, Windows: C:\woyCode). Vorweg erscheint eine Kopfzeile mit Modul-,
     PowerShell-Version und Betriebssystem.
 
+.PARAMETER Full
+    Gibt zusaetzlich alle externen Befehle aus: die exportierten Funktionen des Moduls und
+    (nur Windows) die globalen woy-/Auftrags-Funktionen aus MdsSkripte. Je Befehl erscheint eine
+    Zeile mit Name (Spalte Variable), Kurzbeschreibung (Wert) und Datei (Quelle). Kurzform: -F.
+
 .EXAMPLE
     Show-Mds
+
+.EXAMPLE
+    Show-Mds -F
 
 .EXAMPLE
     Show-Mds | Where-Object Vorhanden -eq $false
@@ -468,7 +477,11 @@ function Show-PowerShell {
 # 2026-11-03 Hubi/Claude: erstellt
 function Show-Mds {
     [CmdletBinding()]
-    param()
+    param(
+        # 2026-11-04 Hubi/Claude: alle externen Befehle mit ausgeben
+        [Alias('F')]
+        [switch] $Full
+    )
 
     $os = if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
     Write-Info "MdsTools $mdsVersion | woy $mdsWoy | PowerShell $($PSVersionTable.PSVersion) | $os"
@@ -506,4 +519,66 @@ function Show-Mds {
             }
         }
     }
+
+    if ($Full) {
+        Get-MdsCommand | ForEach-Object {
+            [pscustomobject]@{ Variable = $_.Name; Wert = $_.Beschreibung; Quelle = $_.Datei; Vorhanden = $null }
+        }
+    }
+}
+
+# [intern] Liefert alle externen Befehle von MdsTools, nach Name sortiert: die exportierten
+# Funktionen des Moduls und die globalen Funktionen aus MdsSkripte (nur Windows geladen).
+# Rueckgabewert: Objekte mit Name, Beschreibung und Datei. Beschreibung ist die .SYNOPSIS, sonst
+# die erste Zeile des Kommentarblocks ueber der Funktion (ohne "[public] <Name> —").
+# 2026-11-04 Hubi/Claude: erstellt fuer Show-Mds -Full
+function Get-MdsCommand {
+    [CmdletBinding()]
+    param()
+
+    $modulOrdner = Split-Path $PSScriptRoot -Parent
+    $befehle = @((Get-Module MdsTools).ExportedFunctions.Values) +
+        @(Get-ChildItem -Path Function:\ | Where-Object {
+            $_.ScriptBlock.File -and $_.ScriptBlock.File.StartsWith((Join-Path $modulOrdner 'MdsSkripte'), [StringComparison]::OrdinalIgnoreCase)
+        })
+    foreach ($befehl in $befehle | Sort-Object Name -Unique) {
+        $hilfe = Get-Help $befehl.Name -ErrorAction SilentlyContinue
+        # Ohne kommentarbasierte Hilfe liefert Get-Help nur die Syntax als Synopsis.
+        $text = if ($hilfe -and $hilfe.Synopsis -and -not $hilfe.Synopsis.Trim().StartsWith($befehl.Name)) {
+            ($hilfe.Synopsis -replace '\s+', ' ').Trim()
+        }
+        else {
+            Get-FunctionComment $befehl
+        }
+        [pscustomobject]@{
+            Name         = $befehl.Name
+            Beschreibung = "$text"
+            Datei        = if ($befehl.ScriptBlock.File) { Split-Path $befehl.ScriptBlock.File -Leaf } else { '' }
+        }
+    }
+}
+
+# [intern] Liefert den ersten Satz des Kommentarblocks direkt ueber einer Funktion, ohne Praefix
+# "[public]"/"[intern]" und ohne "<Name> —". Gelesen wird bis zur ersten eingerueckten Zeile
+# (Parameterliste) oder Zeile mit Datum (Historie). Ohne Kommentar: "".
+# 2026-11-04 Hubi/Claude: erstellt fuer Show-Mds -Full
+function Get-FunctionComment([System.Management.Automation.FunctionInfo] $Befehl) {
+    $datei = $Befehl.ScriptBlock.File
+    if (-not $datei -or -not (Test-Path -LiteralPath $datei -PathType Leaf)) { return '' }
+    $zeilen = @(Get-Content -LiteralPath $datei)
+    $start = $Befehl.ScriptBlock.Ast.Extent.StartLineNumber - 2   # Zeile davor, 0-basiert
+    $block = @()
+    for ($i = $start; $i -ge 0 -and $zeilen[$i] -match '^\s*#(?!>)'; $i--) {
+        $block = , ($zeilen[$i] -replace '^\s*#\s?', '') + $block
+    }
+    $text = @()
+    foreach ($zeile in $block) {
+        if (-not $zeile.Trim() -or $zeile -match '^\s{2}' -or $zeile -match '^\d{4}-\d{2}-\d{2}') { break }
+        $text += $zeile.Trim()
+    }
+    $satz = ($text -join ' ') -replace '^\[(public|intern)\]\s*', ''
+    $satz = $satz -replace "^$([regex]::Escape($Befehl.Name))\s*[—-]\s*", ''
+    # Erster Satz: Punkt nach einem Wort mit mind. 3 Buchstaben (nicht "z. B."), danach Grossbuchstabe oder Ende.
+    if ($satz -match '^(.+?(?:\p{L}{3}|\))\.)(?=\s+\p{Lu}|\s*$)') { $satz = $Matches[1] }
+    return $satz.Trim()
 }

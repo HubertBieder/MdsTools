@@ -30,6 +30,10 @@
 | 2026-11-03 | 0.24    | Hubert Bieder/Claude | Windows: `$mdsWoySrc`/`Bin`/`Run`, Show-Mds mit Zeile `System`, MdsSkripte/Auftrag.ps1    |
 | 2026-11-03 | 0.25    | Hubert Bieder/Claude | Auftragsabwicklung: `mk auf` (Init/Post), `run auf copy`, Schlüssel der woy.env           |
 | 2026-11-03 | 0.26    | Hubert Bieder/Claude | `run auf auto/version/backup/desktop`, `run net nuget`; Backup-Develop liefert Pfad/`$null`; „Verbunden mit“ nur mit `-Verbose` |
+| 2026-11-04 | 0.27    | Hubert Bieder/Claude | 8.2.1: `Show-Mds -Full` (`-F`); globale Skripte unter `Modul/Skripte`, Root-Ordner `scripts/` |
+| 2026-11-04 | 0.28    | Hubert Bieder/Claude | `run`: globale Skripte aus `Mds/scripts`, Abkürzungen; `run backup [Repo] [-Force]`         |
+| 2026-11-04 | 0.29    | Hubert Bieder/Claude | `Install-PowerShell7.ps1/.cmd` (Windows, 5.1) gehört zum Repo; Install/Uninstall zeigen die Modulversion |
+| 2026-11-04 | 0.30    | Hubert Bieder/Claude | 8.2.2: `Show-Repos`; erste Zeile der README.md `# <Name> – <Kurzbeschreibung>`                |
 
 ---
 
@@ -99,6 +103,8 @@ global machen.
    Install.ps1                 # Installation (analog mdsPackage)
    Uninstall.ps1               # entfernt alte Installationen (bisher "clear.ps1")
    InstallHelper.ps1           # gemeinsame Pfad-Helfer für Install.ps1 und Uninstall.ps1
+   Install-PowerShell7.ps1     # nur Windows, läuft unter 5.1: PowerShell 7 prüfen/installieren (-Last, -Version)
+   Install-PowerShell7.cmd     # Starter: 5.1 als Administrator, Argumente werden durchgereicht
    Modul/
       MdsTools/
          MdsTools.psd1         # Manifest, Version, Exportliste
@@ -117,14 +123,15 @@ global machen.
          MdsSkripte/           # *.ps1 – woy/Auftrag (aus mdsProfile.ps1), nur Windows
             InitMDS.ps1        # lädt alle MdsSkripte
             WoyEnv.ps1         # Get-WoyValue, Get-WoyCredential (woy.env)
+      Skripte/                 # globale Skripte (CloneAll, PushAll, …) → $mdsDev
    Profile/
       profile.ps1              # wird nach $PROFILE kopiert
-   Skripte/                    # globale Skripte (CloneAll, PushAll, …)
+   scripts/                    # globale run-Skripte (_backup.ps1), gelten in allen Repos
    tests/                      # Pester-Tests (Invoke-Pester ./tests)
    PSScriptAnalyzerSettings.psd1  # bewusst ausgeschlossene Analyzer-Regeln
 ```
 
-`Skripte/` wird von `Install.ps1` nach `$mdsDev` kopiert, aber nur, wenn die Quelle neuer ist.
+`Modul/Skripte/` wird von `Install.ps1` nach `$mdsDev` kopiert, aber nur, wenn die Quelle neuer ist.
 
 ## Initialisierung und Ablauf
 
@@ -181,6 +188,7 @@ Die Hilfsfunktionen dazu (`Clear-WoyProcess`, `Write-WoyVersionCS`, `Write-Datei
 | `go`       | in einen Ordner bzw. ein Repo springen       | `Navigation.ps1` |
 | `mk`       | Programme eines Repos bauen (`Make.ps1`)     | `Navigation.ps1` |
 | `run`      | Repo-Werkzeuge `scripts/_<Name>.ps1` starten | `Navigation.ps1` |
+| `Show-Repos` | alle Repos mit GitHub-Name, letzter Änderung, Kurzbeschreibung | `Navigation.ps1` |
 | `Show-Mds` | mds-Variablen strukturiert anzeigen          | `Tools.ps1`      |
 
 `go`, `mk` und `run` sind kurze Kleinbuchstaben-Befehle für die tägliche Arbeit; sie folgen bewusst nicht dem
@@ -333,6 +341,11 @@ erkennbar: `scripts/_<Name>.ps1`. Dateien ohne Präfix (z. B. `Make.ps1`, Hilfss
 | `run <Repo> <Name> [Argumente]`   | `scripts/_<Name>.ps1` des Repos ausführen, von überall                             |
 
 - Alle weiteren Argumente gehen unverändert an das Skript, auch benannte: `run net Copy -Ziel TEST-SRV -Force`.
+- **Globale Skripte:** `Mds/scripts/_*.ps1` gelten überall. Hat das aktuelle Repo kein passendes Skript oder
+  steht man außerhalb der Repos (z. B. in Dev), nimmt `run` das Skript aus `Mds/scripts`. Ein gleichnamiges
+  Skript des aktuellen Repos hat Vorrang (z. B. `Auf/scripts/_backup.ps1`).
+- **Abkürzungen:** Eine eindeutige Abkürzung genügt (`run back` = `run backup`); ist sie mehrdeutig, meldet
+  `run` die Treffer.
 - Groß-/Kleinschreibung spielt keine Rolle; Tab vervollständigt Repos und (im Repo-Ordner) Skriptnamen.
 - Wie bei `mk` gewinnt ein Repo-Name: Ein Skript sollte nicht so heißen wie ein Repo.
 - `-List` gehört `run` selbst; ein run-Skript sollte deshalb keinen Parameter `-List` haben.
@@ -342,6 +355,7 @@ erkennbar: `scripts/_<Name>.ps1`. Dateien ohne Präfix (z. B. `Make.ps1`, Hilfss
 
 | Repo | Aufruf                       | Skript                 | Zweck                                                                 |
 | ---- | ---------------------------- | ---------------------- | --------------------------------------------------------------------- |
+| Mds  | `run back[up] [Repo] [-Force] [-Verbose]` | `scripts/_backup.ps1` | global: Repo als `<Repo>_yyyyMMdd.zip` sichern – angegebenes Repo, sonst das aktuelle, außerhalb der Repos Mds; `-Force` erstellt ein vorhandenes Tagesarchiv neu |
 | Auf  | `run auf auto [-MitDatenbank]` | `scripts/_auto.ps1`  | bauen (`mk auf`), lokal kopieren, woyControlCenter starten            |
 | Auf  | `run auf copy [t\|s]`        | `scripts/_copy.ps1`    | Deck nach InstallDir: lokal, TEST-SRV, SQL-SRV                        |
 | Auf  | `run auf version [-Verbose]` | `scripts/_version.ps1` | Versionen aus `Dateiliste.txt` an allen Stellen                       |
@@ -352,6 +366,32 @@ erkennbar: `scripts/_<Name>.ps1`. Dateien ohne Präfix (z. B. `Make.ps1`, Hilfss
 Die Auf-Skripte beschreibt [Auftragsabwicklung](#auftragsabwicklung-nur-windows), `run net nuget` die zentrale
 Übersicht `C:\woyCode\Net\docs\NuGet-Sicherheit.md`.
 
+### Show-Repos – Repos anzeigen
+
+`Show-Repos` listet alle Repos unter `$mdsRepos` (Ordner mit `.git`), nach Name sortiert:
+
+| Spalte         | Quelle                                                                  |
+| -------------- | ----------------------------------------------------------------------- |
+| `Name`         | Ordnername (Kurzname), z. B. `Mds`                                      |
+| `Repo`         | GitHub-Name aus `git remote get-url origin`, z. B. `MdsTools`           |
+| `Datum`        | letzter Commit (`git log -1`), `yyyy-MM-dd HH:mm`                       |
+| `Geändert`     | `True`, wenn es nicht committete Änderungen gibt (`git status`)         |
+| `Beschreibung` | erste Zeile der `README.md`, höchstens 80 Zeichen                       |
+
+`Show-Repos -Full` (kurz `-F`) zeigt zusätzlich `Branch`, `Stand` gegenüber dem Upstream (`aktuell`, `vor 2`,
+`zurueck 1`, ohne vorheriges `fetch`) und die `Remote`-URL. Beispiel: `Show-Repos | Where-Object Geändert`.
+
+```text
+Name Repo           Datum            Geändert Beschreibung
+---- ----           -----            -------- ------------
+Maui NetMauiApps    2026-11-03 21:53    False .NET-MAUI-Anwendungen für Windows und macOS
+Mds  MdsTools       2026-11-03 21:53     True PowerShell-Modul MdsTools für die Multi-Entwicklungsumgebung (MDS)
+```
+
+**Konvention für die README.md:** Die erste Zeile jedes Repos lautet `# <Name> – <Kurzbeschreibung>` (höchstens
+80 Zeichen). Fehlt der Teil nach dem Gedankenstrich, nimmt `Show-Repos` die erste Textzeile nach der Überschrift.
+`.git/description` wird nicht verwendet: Die Datei wird weder versioniert noch geklont.
+
 ### Show-Mds – Variablen anzeigen
 
 `Show-Mds` zeigt eine Kopfzeile (Modulversion, woy-Stand, PowerShell-Version, Betriebssystem) und je Variable eine
@@ -360,12 +400,12 @@ Umgebungsvariable den Ordner umlenkt, sonst `Standard`. Die erste Zeile `System`
 macOS arbeitet. Nur unter Windows folgen am Ende `mdsWoySrc`, `mdsWoyBin` und `mdsWoyRun` (Quelle `Legacy (fest)`).
 
 ```text
-*----  MdsTools 8.2.0 | woy 0 | PowerShell 7.6.9 | macOS  -------
+*----  MdsTools 8.2.1 | woy 0 | PowerShell 7.6.9 | macOS  -------
 
 Variable   Wert                          Quelle        Vorhanden
 --------   ----                          ------        ---------
 System     macOS                         IsMacOS
-mdsVersion 8.2.0                         MdsTools.psd1
+mdsVersion 8.2.1                         MdsTools.psd1
 mdsWoy     0                             macOS
 mdsDev     /Users/hubert/Dev             Standard      True
 mdsRepos   /Users/hubert/Dev/Repos       Standard      True
@@ -381,6 +421,18 @@ mdsWoyRun  D:\woySystems\Bin             Legacy (fest) True
 ```
 
 Die Zeilen sind Objekte und lassen sich weiterverarbeiten, z. B. `Show-Mds | Where-Object Vorhanden -eq $false`.
+
+`Show-Mds -Full` (kurz `-F`) gibt danach alle externen Befehle aus, nach Name sortiert: die exportierten
+Funktionen des Moduls und unter Windows die globalen woy-/Auftrags-Funktionen aus `MdsSkripte`. Je Befehl
+steht in `Variable` der Name, in `Wert` die Kurzbeschreibung (`.SYNOPSIS`, sonst der erste Satz des Kommentars
+über der Funktion) und in `Quelle` die Datei.
+
+```text
+Write-Info     Gibt eine Info-Statuszeile aus.                              Output.ps1
+go             Wechselt in einen Ordner.                                    Navigation.ps1
+mk             Baut Programme eines Repos über $mdsRepos/<Repo>/scripts/…   Navigation.ps1
+…
+```
 
 ## Cmdlets und Funktionen
 
@@ -398,7 +450,7 @@ Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](MdsTools-Mi
 | `Get-TargetFramework`, `Find-CsProj`                             | DevNet    | `Build.ps1`      | nein   | nur intern genutzt                                                                     |
 | `Update-DotNet`, `Update-PowerShell`, `Show-PowerShell`          | Tools     | `Tools.ps1`      | ja     | interaktiv genutzt                                                                     |
 | `Show-Mds`                                                       | neu       | `Tools.ps1`      | ja     | Anzeige der mds-Variablen                                                              |
-| `go`, `mk`, `run`                                                | neu       | `Navigation.ps1` | ja     | Befehle für die tägliche Arbeit                                                        |
+| `go`, `mk`, `run`, `Show-Repos`                                  | neu       | `Navigation.ps1` | ja     | Befehle für die tägliche Arbeit                                                        |
 | `Clear-CodeFolder`, `Clear-Target`, `Remove-Folder`              | FileIO    | `FileIO.ps1`     | ja     | interaktiv genutzt                                                                     |
 | `Copy-FileWithCredential`, `Copy-FolderWithCredential`           | Common    | `Share.ps1`      | ja     | auch auf dem Mac nötig, siehe unten                                                    |
 | `Copy-Folder`, `Remove-OldFile`, `Get-DevelopFiles`              | FileIO    | `FileIO.ps1`     | nein   | kein externer Aufruf gefunden                                                          |
