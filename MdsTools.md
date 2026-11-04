@@ -34,6 +34,7 @@
 | 2026-11-04 | 0.28    | Hubert Bieder/Claude | `run`: globale Skripte aus `Mds/scripts`, Abkürzungen; `run backup [Repo] [-Force]`         |
 | 2026-11-04 | 0.29    | Hubert Bieder/Claude | `Install-PowerShell7.ps1/.cmd` (Windows, 5.1) gehört zum Repo; Install/Uninstall zeigen die Modulversion |
 | 2026-11-04 | 0.30    | Hubert Bieder/Claude | 8.2.2: `Show-Repos`; erste Zeile der README.md `# <Name> – <Kurzbeschreibung>`                |
+| 2026-11-04 | 0.31    | Hubert Bieder/Claude | `run mars`: MARS wecken (Wake-on-LAN) und Freigaben auf LUNA aktivieren                    |
 
 ---
 
@@ -356,6 +357,7 @@ erkennbar: `scripts/_<Name>.ps1`. Dateien ohne Präfix (z. B. `Make.ps1`, Hilfss
 | Repo | Aufruf                       | Skript                 | Zweck                                                                 |
 | ---- | ---------------------------- | ---------------------- | --------------------------------------------------------------------- |
 | Mds  | `run back[up] [Repo] [-Force] [-Verbose]` | `scripts/_backup.ps1` | global: Repo als `<Repo>_yyyyMMdd.zip` sichern – angegebenes Repo, sonst das aktuelle, außerhalb der Repos Mds; `-Force` erstellt ein vorhandenes Tagesarchiv neu |
+| Mds  | `run mars [-Go]` | `scripts/_mars.ps1` | global, nur macOS: MARS bei Bedarf per Wake-on-LAN wecken (LAN `192.168.104.59`), hängende Freigaben `woyCode`/`woyAufInstall` lösen und neu einbinden; `-Go` wechselt nach `/Volumes/woyCode` |
 | Auf  | `run auf auto [-MitDatenbank]` | `scripts/_auto.ps1`  | bauen (`mk auf`), lokal kopieren, woyControlCenter starten            |
 | Auf  | `run auf copy [t\|s]`        | `scripts/_copy.ps1`    | Deck nach InstallDir: lokal, TEST-SRV, SQL-SRV                        |
 | Auf  | `run auf version [-Verbose]` | `scripts/_version.ps1` | Versionen aus `Dateiliste.txt` an allen Stellen                       |
