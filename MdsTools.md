@@ -35,6 +35,7 @@
 | 2026-11-04 | 0.29    | Hubert Bieder/Claude | `Install-PowerShell7.ps1/.cmd` (Windows, 5.1) gehört zum Repo; Install/Uninstall zeigen die Modulversion |
 | 2026-11-04 | 0.30    | Hubert Bieder/Claude | 8.2.2: `Show-Repos`; erste Zeile der README.md `# <Name> – <Kurzbeschreibung>`                |
 | 2026-11-04 | 0.31    | Hubert Bieder/Claude | `run mars`: MARS wecken (Wake-on-LAN) und Freigaben auf LUNA aktivieren                    |
+| 2026-11-04 | 0.32    | Hubert Bieder/Claude | `Update-PowerShell7.ps1/.cmd` (statt Install-…); `Update-PowerShell` installiert unter Windows nicht mehr selbst |
 
 ---
 
@@ -104,8 +105,8 @@ global machen.
    Install.ps1                 # Installation (analog mdsPackage)
    Uninstall.ps1               # entfernt alte Installationen (bisher "clear.ps1")
    InstallHelper.ps1           # gemeinsame Pfad-Helfer für Install.ps1 und Uninstall.ps1
-   Install-PowerShell7.ps1     # nur Windows, läuft unter 5.1: PowerShell 7 prüfen/installieren (-Last, -Version)
-   Install-PowerShell7.cmd     # Starter: 5.1 als Administrator, Argumente werden durchgereicht
+   Update-PowerShell7.ps1      # nur Windows, läuft unter 5.1: PowerShell 7 prüfen/installieren (-Last, -Version)
+   Update-PowerShell7.cmd      # Starter: 5.1 als Administrator, Argumente werden durchgereicht
    Modul/
       MdsTools/
          MdsTools.psd1         # Manifest, Version, Exportliste

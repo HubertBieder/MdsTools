@@ -1,5 +1,5 @@
 #======================================================================
-# Skript:       Install-PowerShell7.ps1  (Teil von MdsTools, liegt neben Install.ps1)
+# Skript:       Update-PowerShell7.ps1  (Teil von MdsTools, liegt neben Install.ps1)
 # Beschreibung: Prueft bzw. installiert PowerShell 7 aus dem offiziellen
 #               GitHub-Release (win-x64-MSI), winget-frei. Nur Windows.
 #
@@ -24,11 +24,11 @@
 #               Das Skript repariert auch den kaputten Zustand "MSI-Produkt
 #               registriert, pwsh.exe fehlt" (REINSTALL=ALL).
 #
-# Aufruf: am einfachsten ueber den Starter Install-PowerShell7.cmd (Doppelklick,
+# Aufruf: am einfachsten ueber den Starter Update-PowerShell7.cmd (Doppelklick,
 #   startet 5.1, umgeht die Execution Policy nur fuer diesen Prozess, holt
 #   Adminrechte per UAC; Argumente werden durchgereicht). Direkt in Windows
 #   PowerShell 5.1 "Als Administrator":
-#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-PowerShell7.ps1
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Update-PowerShell7.ps1
 #     -Last           neueste Version installieren, auch wenn schon eine vorhanden ist
 #     -Version 7.6.4  diese Version installieren (statt der neuesten)
 #     -Force          laufende pwsh.exe-Prozesse vor der Installation beenden
@@ -42,13 +42,15 @@
 #   2026-11-04  Hubi/Claude  2.0.0: Teil von MdsTools; ohne PowerShell 7 installieren, sonst
 #                            nur Version und neuere Version anzeigen; -Last; -Force beendet
 #                            nur noch laufende pwsh.exe; Warnung ohne Adminrechte
+#   2026-11-04  Hubi/Claude  2.1.0: umbenannt von Install-PowerShell7.ps1 (Tab-Vervollstaendigung
+#                            bei ./Inst...); Update-PowerShell im Modul verweist unter Windows hierher
 #
 # PowerShell: 5.1 (Desktop)
 #======================================================================
 
 #Requires -Version 5.1
 
-# Keine Positionsparameter: ".\Install-PowerShell7.ps1 latest" landete sonst
+# Keine Positionsparameter: ".\Update-PowerShell7.ps1 latest" landete sonst
 # als -Repository und lieferte einen 404 von GitHub (11.09.2026).
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -157,7 +159,7 @@ $identitaet = [Security.Principal.WindowsIdentity]::GetCurrent()
 $prinzipal = New-Object Security.Principal.WindowsPrincipal($identitaet)
 if (-not $prinzipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "WARNUNG: Keine Administratorrechte - Abbruch." -ForegroundColor Yellow
-    Write-Host "Bitte 'Als Administrator' starten oder Install-PowerShell7.cmd verwenden." -ForegroundColor Yellow
+    Write-Host "Bitte 'Als Administrator' starten oder Update-PowerShell7.cmd verwenden." -ForegroundColor Yellow
     exit 2
 }
 
@@ -222,7 +224,7 @@ if ($vorhanden -and -not $wunsch) {
     Write-Host "  Neueste:     $zielVersion"
     if ($zielVersion -gt $dateiVersion) {
         Write-Host "Neuere Version verfuegbar: $zielVersion (installiert: $dateiVersion)." -ForegroundColor Yellow
-        Write-Host "Installieren mit: Install-PowerShell7.cmd -Last" -ForegroundColor Yellow
+        Write-Host "Installieren mit: Update-PowerShell7.cmd -Last" -ForegroundColor Yellow
     }
     else {
         Write-Host "PowerShell 7 ist aktuell ($dateiVersion)." -ForegroundColor Green

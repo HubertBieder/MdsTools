@@ -32,16 +32,16 @@ denselben Befehlen:
 
 ## Schnellstart
 
-Voraussetzung: PowerShell 7.6 oder neuer. Unter Windows prüft bzw. installiert `Install-PowerShell7.cmd`
+Voraussetzung: PowerShell 7.6 oder neuer. Unter Windows prüft bzw. installiert `Update-PowerShell7.cmd`
 (Doppelklick, läuft in Windows PowerShell 5.1 als Administrator) die PowerShell 7:
 
 | Aufruf                                   | Wirkung                                                                 |
 | ---------------------------------------- | ----------------------------------------------------------------------- |
-| `Install-PowerShell7.cmd`                | keine PowerShell 7: Warnung, neueste installieren; sonst Version und ob es eine neuere gibt |
-| `Install-PowerShell7.cmd -Last`          | in jedem Fall die neueste Version installieren                          |
-| `Install-PowerShell7.cmd -Version 7.6.4` | diese Version installieren                                              |
+| `Update-PowerShell7.cmd`                 | keine PowerShell 7: Warnung, neueste installieren; sonst Version und ob es eine neuere gibt |
+| `Update-PowerShell7.cmd -Last`           | in jedem Fall die neueste Version installieren                          |
+| `Update-PowerShell7.cmd -Version 7.6.4`  | diese Version installieren                                              |
 
-Ohne Administratorrechte bricht `Install-PowerShell7.ps1` nach einer Warnung ab.
+Ohne Administratorrechte bricht `Update-PowerShell7.ps1` nach einer Warnung ab.
 
 ```powershell
 git clone https://github.com/HubertBieder/MdsTools.git ~/Dev/Repos/Mds   # Windows: C:\woyCode\Mds
@@ -72,7 +72,7 @@ Mds/
    MdsTools.md                # Beschreibung des Moduls
    MdsTools-Migration.md      # Ablösung von mdsPackage
    Install.ps1 / Uninstall.ps1 / InstallHelper.ps1
-   Install-PowerShell7.ps1/.cmd  # nur Windows: PowerShell 7 prüfen/installieren (läuft unter 5.1)
+   Update-PowerShell7.ps1/.cmd   # nur Windows: PowerShell 7 prüfen/installieren (läuft unter 5.1)
    Modul/MdsTools/            # das Modul (Manifest, SkriptModule, MdsSkripte)
    Modul/Skripte/             # globale Skripte (CloneAll, PushAll, …) → $mdsDev
    Profile/profile.ps1        # wird nach $PROFILE kopiert

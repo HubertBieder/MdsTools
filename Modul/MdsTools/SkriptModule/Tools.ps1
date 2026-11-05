@@ -9,6 +9,8 @@
 #   2026-11-03  Hubi/Claude  Show-Mds
 #   2026-11-03  Hubi/Claude  Show-Mds: Zeile System, Windows-Zeilen mdsWoySrc/Bin/Run
 #   2026-11-04  Hubi/Claude  Show-Mds -Full (-F): zusaetzlich alle externen Befehle
+#   2026-11-04  Hubi/Claude  Update-PowerShell: unter Windows nur Anzeige, Installation ueber
+#                            Update-PowerShell7.cmd (Windows PowerShell 5.1); Install-PowerShell7FromGithub entfaellt
 #
 # Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell, Show-Mds
 #======================================================================
@@ -165,47 +167,6 @@ function Install-DotNetFromOfficial {
     }
 }
 
-# [intern] Laedt die x64-MSI des neuesten PowerShell-7-Releases von GitHub und installiert
-# sie maschinenweit per msiexec. Sinnvoll, wenn der winget-Index hinterherhinkt. Laeuft
-# auch aus Windows PowerShell 5.1 (setzt TLS 1.2), also fuer den Erst-Bootstrap geeignet.
-#   Repository  GitHub-Repository "Besitzer/Repo"
-# Rueckgabewert: $true bei erfolgreicher Installation, sonst $false.
-function Install-PowerShell7FromGithub {
-    [CmdletBinding()]
-    param(
-        [Parameter(Position = 0, HelpMessage = "GitHub-Repository in der Form 'Besitzer/Repo'")]
-        [string] $Repository = "PowerShell/PowerShell"
-    )
-
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" `
-            -Headers @{ 'User-Agent' = 'MdsTools' } -TimeoutSec 30
-        $asset = $release.assets | Where-Object { $_.name -match 'win-x64\.msi$' } | Select-Object -First 1
-        if (-not $asset) {
-            Write-Error "Kein win-x64-MSI-Asset im neuesten Release von $Repository gefunden."
-            return $false
-        }
-
-        $msiPfad = Join-Path $env:TEMP $asset.name
-        Write-Host "Lade $($asset.name) ..." -ForegroundColor Yellow
-        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $msiPfad -UseBasicParsing
-
-        $prozess = Start-Process msiexec.exe `
-            -ArgumentList "/i `"$msiPfad`" /quiet /norestart" -Wait -PassThru
-        Remove-Item -LiteralPath $msiPfad -ErrorAction SilentlyContinue
-
-        if ($prozess.ExitCode -ne 0) {
-            Write-Error "msiexec fehlgeschlagen (Exit-Code $($prozess.ExitCode)). Hinweis: maschinenweite Installation erfordert erhöhte Rechte."
-            return $false
-        }
-        return $true
-    }
-    catch {
-        Write-Error "Installation von GitHub fehlgeschlagen: $_"
-        return $false
-    }
-}
-
 # [public] Update-DotNet — Prueft die installierte .NET-SDK-Version und aktualisiert
 # sie ohne Bedienereingriff, falls sie unter der Zielversion liegt. Standardweg ist
 # winget-FREI ueber dotnet-install (https://dot.net; laeuft auch aus WinPS 5.1). Mit
@@ -305,31 +266,47 @@ function Update-DotNet {
     return $false
 }
 
-# [public] Update-PowerShell — Prueft die installierte PowerShell-7-Version und
-# aktualisiert sie, falls sie unter der Zielversion liegt. Mit -Last ist das Ziel die
+# [public] Update-PowerShell — Prueft die installierte PowerShell-7-Version und aktualisiert
+# sie im laufenden Betrieb, falls sie unter der Zielversion liegt. Mit -Last ist das Ziel die
 # neueste GitHub-Release-Version.
-#   Windows: winget (maschinenweit) bzw. mit -Last MSI direkt von GitHub; erfordert Adminrechte.
 #   macOS:   Homebrew (cask powershell), falls darueber installiert, sonst PKG von GitHub
 #            per 'sudo installer' (fragt nach dem Passwort).
+#   Windows: nur Anzeige (installierte und neueste Version). Installiert wird mit
+#            Update-PowerShell7.cmd im Repo Mds: Es laeuft in Windows PowerShell 5.1, denn ein
+#            MSI-Update aus der laufenden pwsh beendet diese pwsh mitten in der Installation.
 #   MinVersion  Mindest-Zielversion
-#   PackageId   winget-Paket-ID (nur Windows)
 #   Last        Auf die neueste GitHub-Release-Version aktualisieren
 # Rueckgabewert: $true wenn aktuell genug (oder Update erfolgreich), sonst $false.
 # 2026-10-31 Hubi/Claude: macOS-Zweig aus UpdatePS.ps1 uebernommen (E9), UpdatePS.ps1 entfaellt
+# 2026-11-04 Hubi/Claude: Windows nur Anzeige, Verweis auf Update-PowerShell7.cmd; ohne -PackageId
 function Update-PowerShell {
     [CmdletBinding()]
     param(
         [Parameter(Position = 0, HelpMessage = "Mindest-Zielversion")]
         [version] $MinVersion = [version]"7.6.2",
 
-        [Parameter(Position = 1, HelpMessage = "winget-Paket-ID (nur Windows)")]
-        [string] $PackageId = "Microsoft.PowerShell",
-
         [Parameter(HelpMessage = "Auf die neueste GitHub-Release-Version aktualisieren")]
         [switch] $Last
     )
 
     $aktuell = Get-InstalledPwshVersion
+
+    # Windows: nur anzeigen, installiert wird aus Windows PowerShell 5.1 (Update-PowerShell7.cmd)
+    if ($IsWindows) {
+        $neueste = Get-GithubLatestVersion -Repository 'PowerShell/PowerShell'
+        $ziel = if ($Last -and $neueste -gt $MinVersion) { $neueste } else { $MinVersion }
+        Write-Host "PowerShell 7 installiert: $aktuell" -ForegroundColor Cyan
+        if ($neueste -gt [version]'0.0.0') { Write-Host "Neueste Version:          $neueste" }
+        $starter = Join-Path (Join-Path $mdsRepos 'Mds') 'Update-PowerShell7.cmd'
+        if ($neueste -gt $aktuell -or $aktuell -lt $ziel) {
+            Write-Host "Aktualisieren aus Windows PowerShell 5.1 (nicht aus pwsh):" -ForegroundColor Yellow
+            Write-Host "  $starter -Last" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "PowerShell 7 ist aktuell." -ForegroundColor Green
+        }
+        return ($aktuell -ge $ziel)
+    }
 
     # Bei -Last die neueste GitHub-Version als Ziel verwenden
     if ($Last) {
@@ -365,28 +342,6 @@ function Update-PowerShell {
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Update meldete Exit-Code $LASTEXITCODE."
             return $false
-        }
-    }
-    elseif ($IsWindows) {
-        # Erst wenn wirklich installiert werden muss, Adminrechte einfordern.
-        if (-not (Assert-Admin "Das Aktualisieren von PowerShell 7")) { return $false }
-
-        if ($Last) {
-            # Direkt von GitHub installieren, da der winget-Index oft hinterherhinkt
-            if (-not (Install-PowerShell7FromGithub)) { return $false }
-        }
-        else {
-            Write-Host "Installiere $PackageId (maschinenweit) über winget ..." -ForegroundColor Yellow
-            if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-                Write-Error "winget ist nicht installiert/verfügbar. Installation nicht möglich."
-                return $false
-            }
-            winget install --id $PackageId --scope machine --silent `
-                --accept-package-agreements --accept-source-agreements --disable-interactivity
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error "winget-Installation fehlgeschlagen (Exit-Code $LASTEXITCODE). Hinweis: maschinenweite Installation erfordert erhöhte Rechte."
-                return $false
-            }
         }
     }
     else {

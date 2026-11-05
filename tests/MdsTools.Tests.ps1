@@ -1,4 +1,4 @@
-#Requires -Modules Pester
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.5.0' }
 <#
 .SYNOPSIS
     Pester-Tests fuer MdsTools (MdsTools.md, Schritt 8).
@@ -21,6 +21,7 @@
     1.6.0    2026-11-04  Hubi/Claude   Show-Mds -Full
     1.7.0    2026-11-04  Hubi/Claude   run: globale Skripte aus Mds/scripts, Abkuerzungen
     1.8.0    2026-11-04  Hubi/Claude   Show-Repos
+    1.8.1    2026-11-04  Hubi/Claude   Mindestversion Pester 5.5.0 (Windows bringt 3.4.0 mit)
 #>
 
 BeforeAll {
