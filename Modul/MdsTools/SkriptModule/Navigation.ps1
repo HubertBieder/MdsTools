@@ -11,6 +11,7 @@
 #   2026-11-03  Hubi/Claude  go: nur Ordner mit .git (keine Laufzeitordner unter C:\woyCode)
 #   2026-11-04  Hubi/Claude  run: globale Skripte aus Mds/scripts, eindeutige Abkuerzung (run back)
 #   2026-11-04  Hubi/Claude  Show-Repos: Repos mit GitHub-Name, letzter Aenderung, Kurzbeschreibung
+#   2026-11-05  Hubi/Claude  go dev entfaellt, go ohne Argument = go repos (8.3)
 #
 # Oeffentlich: go, mk, run
 #======================================================================
@@ -24,26 +25,24 @@ function Get-GoRepo {
         Select-Object -ExpandProperty Name
 }
 
-# [intern] Liefert alle gueltigen Sprungziele fuer go: dev, repos, root und die Repo-Kurznamen.
+# [intern] Liefert alle gueltigen Sprungziele fuer go: repos, root und die Repo-Kurznamen.
 function Get-GoTarget {
-    return @('dev', 'repos', 'root') + @(Get-GoRepo)
+    return @('repos', 'root') + @(Get-GoRepo)
 }
 
 # [public] go — Wechselt in einen Ordner. Gross-/Kleinschreibung spielt keine Rolle.
-#   go / go dev   -> $mdsDev
-#   go repos      -> $mdsRepos
+#   go / go repos -> $mdsRepos
 #   go root       -> $mdsRoot
-# Unter Windows zeigen dev, repos und root auf denselben Ordner (C:\woyCode).
 #   go <Kurzname> -> $mdsRepos/<Kurzname> (nur Ordner mit .git)
+# 2026-11-05 Hubi/Claude: go dev entfaellt ($mdsDev gibt es nicht mehr), go = go repos (8.3)
 function go {
     [CmdletBinding()]
     param
     (
-        [Parameter(Position = 0, Mandatory = $false, HelpMessage = "dev, repos, root oder Repo-Kurzname")]
-        [string] $Ziel = 'dev'
+        [Parameter(Position = 0, Mandatory = $false, HelpMessage = "repos, root oder Repo-Kurzname")]
+        [string] $Ziel = 'repos'
     )
     switch ($Ziel.ToLowerInvariant()) {
-        'dev' { Set-Location -LiteralPath $mdsDev; return }
         'repos' { Set-Location -LiteralPath $mdsRepos; return }
         'root' { Set-Location -LiteralPath $mdsRoot; return }
     }

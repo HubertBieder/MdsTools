@@ -11,6 +11,8 @@
 #   2026-11-03  Hubi/Claude  $mdsWoy (Windows 26, sonst 0)
 #   2026-11-03  Hubi/Claude  Windows: Root auf D:\Dev\Root, wenn Laufwerk D: vorhanden, sonst C:\Dev\Root
 #   2026-11-03  Hubi/Claude  Windows: Legacy-Adressen $mdsWoySrc, $mdsWoyBin, $mdsWoyRun
+#   2026-11-05  Hubi/Claude  8.3: $mdsDev und DEV_HOME entfallen; Repos und Root unabhaengig
+#                            (macOS ~/Repos, ~/Root; Windows C:\woyCode, D:\Root bzw. C:\Root)
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -23,7 +25,7 @@ try {
 catch { }
 
 # Globale Variablen (MdsTools.md, Abschnitt Globale Variablen).
-# Regel: $env:DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_HOME = ~/Dev bzw. C:\woyCode, DEV_ROOT = ~/Dev/Root).
+# Regel: $env:DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_REPOS, DEV_ROOT, DEV_BIN, ...).
 # Gleiche Logik wie die C#-Klasse xBase.BaseRoot in NetCoreLib2026.
 function Get-DevOrdner([string]$Name, [string]$Basis) {
     $wert = [Environment]::GetEnvironmentVariable("DEV_$($Name.ToUpperInvariant())")
@@ -45,26 +47,22 @@ if ($IsWindows) {
     $global:mdsWoyBin = 'C:\woyCode\Auf\Bin'
     $global:mdsWoyRun = 'D:\woySystems\Bin'
 }
-# 2026-11-03 Hubi/Claude: Windows und macOS unterscheiden (wie xBase.BaseRoot).
-#   macOS/Linux: ~/Dev mit Unterordnern Repos/ und Root/ (Hierarchie)
-#   Windows:     feste Basis C:\woyCode fuer $mdsDev und $mdsRepos (Repos direkt darin).
-#                $mdsRoot = D:\Dev\Root, wenn es ein Laufwerk D: gibt (MARS), sonst C:\Dev\Root.
-#                Fehlende Ordner (Root, Bin, Config, ...) werden unten angelegt.
-# DEV_<NAME> lenkt auf beiden Systemen weiterhin genau den Ordner <Name> um.
-$mdsWindowsBasis = 'C:\woyCode'
+# 2026-11-05 Hubi/Claude: Repos und Root unabhaengig, ohne gemeinsamen Elternordner (8.3).
+#   macOS/Linux: $mdsRepos = ~/Repos, $mdsRoot = ~/Root
+#   Windows:     $mdsRepos = C:\woyCode, $mdsRoot = D:\Root, wenn es ein Laufwerk D: gibt (MARS), sonst C:\Root.
+#   Fehlende Ordner (Repos, Root, Bin, Config, ...) werden unten angelegt.
+# DEV_<NAME> lenkt auf beiden Systemen genau den Ordner <Name> um.
 if ($IsWindows) {
-    $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { $mdsWindowsBasis }
-    $global:mdsRepos = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $mdsDev }
-    $global:mdsRoot = if ($env:DEV_ROOT) { $env:DEV_ROOT }
-    elseif (Test-Path -LiteralPath 'D:\' -PathType Container) { 'D:\Dev\Root' }
-    else { 'C:\Dev\Root' }
+    $standardRepos = 'C:\woyCode'
+    $standardRoot = if (Test-Path -LiteralPath 'D:\' -PathType Container) { 'D:\Root' } else { 'C:\Root' }
 }
 else {
-    $global:mdsDev = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path $HOME 'Dev' }
-    $global:mdsRepos = Get-DevOrdner 'Repos' $mdsDev
-    $global:mdsRoot = Get-DevOrdner 'Root' $mdsDev
+    $standardRepos = Join-Path $HOME 'Repos'
+    $standardRoot = Join-Path $HOME 'Root'
 }
-Remove-Variable mdsWindowsBasis
+$global:mdsRepos = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $standardRepos }
+$global:mdsRoot = if ($env:DEV_ROOT) { $env:DEV_ROOT } else { $standardRoot }
+Remove-Variable standardRepos, standardRoot
 $global:mdsBin = Get-DevOrdner 'Bin' $mdsRoot
 $global:mdsConfig = Get-DevOrdner 'Config' $mdsRoot
 $global:mdsData = Get-DevOrdner 'Data' $mdsRoot

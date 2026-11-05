@@ -11,6 +11,7 @@
 #   2026-11-04  Hubi/Claude  Show-Mds -Full (-F): zusaetzlich alle externen Befehle
 #   2026-11-04  Hubi/Claude  Update-PowerShell: unter Windows nur Anzeige, Installation ueber
 #                            Update-PowerShell7.cmd (Windows PowerShell 5.1); Install-PowerShell7FromGithub entfaellt
+#   2026-11-05  Hubi/Claude  Show-Mds: Zeile mdsDev entfaellt (8.3)
 #
 # Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell, Show-Mds
 #======================================================================
@@ -412,7 +413,7 @@ function Show-PowerShell {
 .DESCRIPTION
     Liefert je Variable ein Objekt mit Wert, Quelle und (bei Ordnern) ob der Ordner existiert.
     Quelle ist "DEV_<NAME>", wenn die Umgebungsvariable den Ordner umlenkt, sonst "Standard"
-    (macOS: ~/Dev-Hierarchie, Windows: C:\woyCode). Vorweg erscheint eine Kopfzeile mit Modul-,
+    (macOS: ~/Repos, ~/Root; Windows: C:\woyCode, D:\Root bzw. C:\Root). Vorweg erscheint eine Kopfzeile mit Modul-,
     PowerShell-Version und Betriebssystem.
 
 .PARAMETER Full
@@ -448,7 +449,7 @@ function Show-Mds {
     [pscustomobject]@{ Variable = 'mdsWoy'; Wert = "$mdsWoy"; Quelle = $os; Vorhanden = $null }
 
     $ordner = [ordered]@{
-        mdsDev = 'HOME'; mdsRepos = 'REPOS'; mdsRoot = 'ROOT'; mdsBin = 'BIN'
+        mdsRepos = 'REPOS'; mdsRoot = 'ROOT'; mdsBin = 'BIN'
         mdsConfig = 'CONFIG'; mdsData = 'DATA'; mdsLogs = 'LOGS'; mdsTemp = 'TEMP'
     }
     foreach ($eintrag in $ordner.GetEnumerator()) {

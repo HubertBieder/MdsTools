@@ -4,8 +4,8 @@
     Pester-Tests fuer MdsTools (MdsTools.md, Schritt 8).
 
 .DESCRIPTION
-    Laedt das Modul aus dem Repo (nicht die installierte Kopie) mit $env:DEV_HOME im
-    Pester-TestDrive, damit weder ~/Dev noch der echte PATH veraendert werden.
+    Laedt das Modul aus dem Repo (nicht die installierte Kopie) mit $env:DEV_REPOS/DEV_ROOT im
+    Pester-TestDrive, damit weder die echten Repos/Root noch der echte PATH veraendert werden.
     Aufruf: Invoke-Pester ./tests
 
 .NOTES
@@ -22,6 +22,7 @@
     1.7.0    2026-11-04  Hubi/Claude   run: globale Skripte aus Mds/scripts, Abkuerzungen
     1.8.0    2026-11-04  Hubi/Claude   Show-Repos
     1.8.1    2026-11-04  Hubi/Claude   Mindestversion Pester 5.5.0 (Windows bringt 3.4.0 mit)
+    1.9.0    2026-11-05  Hubi/Claude   Repos/Root unabhaengig, ohne mdsDev/DEV_HOME/go dev (8.3)
 #>
 
 BeforeAll {
@@ -31,9 +32,12 @@ BeforeAll {
         [Environment]::SetEnvironmentVariable("DEV_$n", $null)
     }
     $script:alterPath = $env:PATH
-    $env:DEV_HOME = Join-Path $TestDrive 'Dev'
-    # Windows: Root laege sonst auf D:\Dev\Root (echtes Laufwerk) - in den TestDrive lenken
-    $script:testRoot = if ($IsWindows) { Join-Path $TestDrive 'Root' } else { $null }
+    # $mdsDev aus einer aelteren MdsTools-Version in der Sitzung entfernen (gibt es ab 8.3 nicht mehr)
+    Remove-Variable -Name mdsDev -Scope Global -ErrorAction SilentlyContinue
+    # Repos und Root in den TestDrive lenken (sonst ~/Repos, ~/Root bzw. C:\woyCode, D:\Root)
+    $script:testRepos = Join-Path $TestDrive 'Repos'
+    $script:testRoot = Join-Path $TestDrive 'Root'
+    $env:DEV_REPOS = $script:testRepos
     $env:DEV_ROOT = $script:testRoot
     $script:manifest = Join-Path $PSScriptRoot '../Modul/MdsTools/MdsTools.psd1'
     Remove-Module MdsTools -ErrorAction SilentlyContinue
@@ -75,17 +79,10 @@ Describe 'Modul' {
 }
 
 Describe 'Globale Variablen und Root-Ordner' {
-    It 'leitet alle Pfade aus DEV_HOME ab' {
-        $mdsDev | Should -Be $env:DEV_HOME
-        if ($IsWindows) {
-            # Windows: Repos liegen direkt in $mdsDev, Root ist im Test per DEV_ROOT umgelenkt
-            $mdsRepos | Should -Be $mdsDev
-            $mdsRoot | Should -Be $script:testRoot
-        }
-        else {
-            $mdsRepos | Should -Be (Join-Path $mdsDev 'Repos')
-            $mdsRoot | Should -Be (Join-Path $mdsDev 'Root')
-        }
+    It 'setzt Repos und Root unabhaengig, Bin ... Temp unter Root' {
+        $mdsRepos | Should -Be $script:testRepos
+        $mdsRoot | Should -Be $script:testRoot
+        Get-Variable -Name mdsDev -Scope Global -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         $mdsBin | Should -Be (Join-Path $mdsRoot 'Bin')
         $mdsTemp | Should -Be (Join-Path $mdsRoot 'Temp')
     }
@@ -101,12 +98,12 @@ Describe 'Globale Variablen und Root-Ordner' {
 
     It 'Show-Mds zeigt Version, woy und alle Ordner mit Quelle' {
         $zeilen = Show-Mds 6>$null
-        $soll = @('System', 'mdsVersion', 'mdsWoy', 'mdsDev', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp')
+        $soll = @('System', 'mdsVersion', 'mdsWoy', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp')
         if ($IsWindows) { $soll += 'mdsWoySrc', 'mdsWoyBin', 'mdsWoyRun' }
         $zeilen.Variable | Should -Be $soll
         ($zeilen | Where-Object Variable -eq 'System').Wert | Should -Be $(if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' })
         ($zeilen | Where-Object Variable -eq 'mdsVersion').Wert | Should -Be "$mdsVersion"
-        ($zeilen | Where-Object Variable -eq 'mdsDev').Quelle | Should -Be 'DEV_HOME'
+        ($zeilen | Where-Object Variable -eq 'mdsRepos').Quelle | Should -Be 'DEV_REPOS'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Quelle | Should -Be 'Standard'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Vorhanden | Should -BeTrue
     }
@@ -128,14 +125,13 @@ Describe 'Globale Variablen und Root-Ordner' {
         $env:DEV_CONFIG = Join-Path $TestDrive 'Konfig'
         try {
             Import-Module $script:manifest -Force
-            $mdsDev | Should -Be $env:DEV_HOME
             $mdsRepos | Should -Be $env:DEV_REPOS
             $mdsRoot | Should -Be $env:DEV_ROOT
             $mdsBin | Should -Be (Join-Path $env:DEV_ROOT 'Bin')
             $mdsConfig | Should -Be $env:DEV_CONFIG
         }
         finally {
-            $env:DEV_REPOS = $null; $env:DEV_ROOT = $script:testRoot; $env:DEV_CONFIG = $null
+            $env:DEV_REPOS = $script:testRepos; $env:DEV_ROOT = $script:testRoot; $env:DEV_CONFIG = $null
             Import-Module $script:manifest -Force
         }
     }
@@ -150,9 +146,14 @@ Describe 'go' {
     BeforeEach { Push-Location $TestDrive }
     AfterEach { Pop-Location }
 
-    It 'springt ohne Argument nach $mdsDev' {
+    It 'springt ohne Argument nach $mdsRepos' {
         go
-        (Get-Location).Path | Should -Be $mdsDev
+        (Get-Location).Path | Should -Be $mdsRepos
+    }
+
+    It 'kennt das Ziel dev nicht mehr' {
+        go dev 3>$null
+        (Get-Location).Path | Should -Be $TestDrive.ToString()
     }
 
     It 'springt nach root (Gross-/Kleinschreibung egal)' {

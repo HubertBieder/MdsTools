@@ -1,15 +1,15 @@
 ﻿<#
 .SYNOPSIS
-    Holt bzw. aktualisiert die Entwicklungs-Repositories (macOS: ~/Dev/Repos, Windows: C:\woyCode).
+    Holt bzw. aktualisiert die Entwicklungs-Repositories (macOS: ~/Repos, Windows: C:\woyCode).
 
 .DESCRIPTION
     Für jedes Repository aus der Repo-Tabelle (GitHub-Name -> lokaler Kurzname):
       - nicht vorhanden          -> git clone nach Repos/<Kurzname>
       - vorhanden, sauber        -> git pull --ff-only
       - vorhanden, mit lokalen Änderungen -> Warnung, wird übersprungen (nichts wird gelöscht)
-    macOS/Linux: Dev ist der Ordner, in dem das Skript liegt (~/Dev), die Repos liegen in Dev/Repos.
+    macOS/Linux: Repos ist der Ordner, in dem das Skript liegt (~/Repos).
     Windows:     feste Basis C:\woyCode, die Repos liegen direkt darin (wie $mdsRepos in MdsTools).
-    $env:DEV_HOME bzw. $env:DEV_REPOS übersteuern.
+    $env:DEV_REPOS übersteuert.
 
 .PARAMETER Repos
     Kurznamen oder GitHub-Namen. Standard: alle aus der Repo-Tabelle (Mds, Net, Maui, PHB).
@@ -30,13 +30,14 @@
     3.2.0    2026-11-03  Hubi/Claude   Windows: Repos direkt in C:\woyCode statt C:\woyCode\Repos;
                                        Zielverzeichnis am Ende ausgeben
     3.3.0    2026-11-04  Hubi/Claude   Im Repo unter Modul/Skripte (statt Skripte)
+    3.4.0    2026-11-05  Hubi/Claude   Ohne Dev-Ordner: Skript liegt direkt in Repos (~/Repos), DEV_HOME entfällt
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.3.0'
+$ScriptVersion = '3.4.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -53,24 +54,21 @@ $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
 $hostName  = [System.Net.Dns]::GetHostName()
 
-# --- Dev und Repos bestimmen (gleiche Logik wie InitModule.ps1 in MdsTools).
-#     Windows: feste Basis C:\woyCode, Repos direkt darin (eine Ebene).
-#     macOS/Linux: Ordner des Skripts (~/Dev); laeuft es direkt aus dem Repo (Repos/Mds/Modul/Skripte),
-#     vier Ebenen nach oben; Repos in Dev/Repos.
-#     $env:DEV_HOME / $env:DEV_REPOS uebersteuern. ---
+# --- Repos bestimmen (gleiche Logik wie InitModule.ps1 in MdsTools).
+#     Windows: feste Basis C:\woyCode, Repos direkt darin.
+#     macOS/Linux: Ordner des Skripts (~/Repos); laeuft es direkt aus dem Repo (Repos/Mds/Modul/Skripte),
+#     drei Ebenen nach oben.
+#     $env:DEV_REPOS uebersteuert. ---
 if ($onWindows) {
-    $DevDir = if ($env:DEV_HOME) { $env:DEV_HOME } else { 'C:\woyCode' }
-    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { $DevDir }
+    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { 'C:\woyCode' }
 }
 else {
-    $DevDir = $PSScriptRoot
+    $ReposDir = $PSScriptRoot
     # 2026-11-04 Hubi/Claude: Skripte liegen im Repo unter Modul/Skripte (Repos/Mds/Modul/Skripte)
-    $repoDir = Split-Path (Split-Path $DevDir -Parent) -Parent
-    if ((Split-Path $DevDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path $repoDir -Parent) -Leaf) -eq 'Repos') {
-        $DevDir = Split-Path (Split-Path $repoDir -Parent) -Parent
+    if ((Split-Path $ReposDir -Leaf) -eq 'Skripte' -and (Split-Path (Split-Path $ReposDir -Parent) -Leaf) -eq 'Modul') {
+        $ReposDir = Split-Path (Split-Path (Split-Path $ReposDir -Parent) -Parent) -Parent
     }
-    if ($env:DEV_HOME) { $DevDir = $env:DEV_HOME }
-    $ReposDir = if ($env:DEV_REPOS) { $env:DEV_REPOS } else { Join-Path $DevDir 'Repos' }
+    if ($env:DEV_REPOS) { $ReposDir = $env:DEV_REPOS }
 }
 
 # --- Auswahl: Kurz- oder GitHub-Namen auf Tabelleneinträge abbilden ---

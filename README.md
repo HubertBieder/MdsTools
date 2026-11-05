@@ -17,7 +17,7 @@ Dieses Repository (GitHub: **MdsTools**, lokaler Ordner **Mds**) enthält das Po
 unterstützt die Entwicklung von C#- (und Python-) Systemen auf **macOS (LUNA)** und **Windows (MARS)** mit
 denselben Befehlen:
 
-- einheitliche Verzeichnisstruktur und globale Variablen (`$mdsDev`, `$mdsRepos`, `$mdsBin`, …),
+- einheitliche Verzeichnisstruktur und globale Variablen (`$mdsRepos`, `$mdsRoot`, `$mdsBin`, …),
 - schnelle Befehle für die tägliche Arbeit: `go` (springen), `mk` (bauen), `run` (Repo-Werkzeuge),
 - Cmdlets zum Bauen und Veröffentlichen (`Publish-DotNet`, `Invoke-Make`), für Dateien, ZIP und SMB-Freigaben,
 - unter Windows zusätzlich die woy- und Auftragsfunktionen.
@@ -44,8 +44,8 @@ Voraussetzung: PowerShell 7.6 oder neuer. Unter Windows prüft bzw. installiert 
 Ohne Administratorrechte bricht `Update-PowerShell7.ps1` nach einer Warnung ab.
 
 ```powershell
-git clone https://github.com/HubertBieder/MdsTools.git ~/Dev/Repos/Mds   # Windows: C:\woyCode\Mds
-cd ~/Dev/Repos/Mds
+git clone https://github.com/HubertBieder/MdsTools.git ~/Repos/Mds   # Windows: C:\woyCode\Mds
+cd ~/Repos/Mds
 ./Install.ps1          # Modul, Profil und globale Skripte installieren
 ```
 
@@ -55,6 +55,7 @@ Danach in einer neuen Shell:
 Show-Mds               # Version, woy-Stand und alle Ordner anzeigen
 Show-Mds -F            # zusätzlich alle Befehle des Moduls
 Show-Repos             # alle Repos: GitHub-Name, letzte Änderung, Kurzbeschreibung
+go                     # nach Repos springen (go root: nach Root)
 go net                 # ins Repo Net springen
 mk                     # im Repo-Ordner: alle Programme bauen
 run                    # Werkzeuge des Repos (scripts/_*.ps1) anzeigen
@@ -74,7 +75,7 @@ Mds/
    Install.ps1 / Uninstall.ps1 / InstallHelper.ps1
    Update-PowerShell7.ps1/.cmd   # nur Windows: PowerShell 7 prüfen/installieren (läuft unter 5.1)
    Modul/MdsTools/            # das Modul (Manifest, SkriptModule, MdsSkripte)
-   Modul/Skripte/             # globale Skripte (CloneAll, PushAll, …) → $mdsDev
+   Modul/Skripte/             # globale Skripte (CloneAll, PushAll, …) → $mdsRepos
    Profile/profile.ps1        # wird nach $PROFILE kopiert
    scripts/                   # globale run-Skripte (run backup)
    tests/                     # Pester-Tests

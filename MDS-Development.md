@@ -4,13 +4,14 @@
 
 ## Historie
 
-| Datum      | Version | Autor                | Änderung                                                                                              |
-| ---------- | ------- | -------------------- | ----------------------------------------------------------------------------------------------------- |
-| 2026-10-31 | 0.1     | Hubert Bieder/Claude | Erste Fassung (LUNA/MARS, `~/Dev`, Repos, Kurznamen)                                                  |
-| 2026-11-01 | 0.2     | Hubert Bieder/Claude | `DEV_<NAME>` lenkt genau den Ordner `<Name>` um (`DEV_HOME` = `~/Dev`)                                |
-| 2026-11-03 | 1.0     | Hubert Bieder/Claude | Neu gegliedert: nur Systematik; Windows flach unter `C:\woyCode`; `$mdsWoy`; Umsetzung in MdsTools.md |
-| 2026-11-03 | 1.1     | Hubert Bieder/Claude | Windows: Root auf `D:\Dev\Root`, ohne Laufwerk D: auf `C:\Dev\Root`                                 |
+| Datum      | Version | Autor                | Änderung                                                                                                  |
+| ---------- | ------- | -------------------- | --------------------------------------------------------------------------------------------------------- |
+| 2026-10-31 | 0.1     | Hubert Bieder/Claude | Erste Fassung (LUNA/MARS, `~/Dev`, Repos, Kurznamen)                                                      |
+| 2026-11-01 | 0.2     | Hubert Bieder/Claude | `DEV_<NAME>` lenkt genau den Ordner `<Name>` um (`DEV_HOME` = `~/Dev`)                                    |
+| 2026-11-03 | 1.0     | Hubert Bieder/Claude | Neu gegliedert: nur Systematik; Windows flach unter `C:\woyCode`; `$mdsWoy`; Umsetzung in MdsTools.md     |
+| 2026-11-03 | 1.1     | Hubert Bieder/Claude | Windows: Root auf `D:\Dev\Root`, ohne Laufwerk D: auf `C:\Dev\Root`                                       |
 | 2026-11-03 | 1.2     | Hubert Bieder/Claude | Ausnahme Auftragsabwicklung (Legacy-Pfade), Repo `Auf`, Init/Post nur bei vollem Lauf, Doku in `Net/docs` |
+| 2026-11-05 | 1.3     | Hubert Bieder/Claude | Repos und Root unabhängig (`~/Repos`, `~/Root`; `C:\woyCode`, `D:\Root`); Dev entfällt (MdsTools 8.3); Umstellungsrezept |
 
 ## Inhalt und Abgrenzung
 
@@ -27,7 +28,7 @@ steht in [MdsTools.md](MdsTools.md), dort auch die Auftragsabwicklung unter Wind
 - Schwerpunkt: C#-Entwicklung (WinForms, WPF, .NET MAUI, Services), zusätzlich Python.
 - **Konventionen statt Konfiguration**: Die JSON-getriebene Modellierung von mdsPackage ist abgelöst.
 - Das alte Auftragsprogramm **woy** wird nicht weiterentwickelt. Unter Windows bleibt sein Ordner `C:\woyCode`
-  aber die Basis der Umgebung (siehe [Windows](#windows-mars-flach-unter-cwoycode)).
+  aber die Basis der Umgebung (siehe [Windows](#windows-mars)).
 
 ## Systeme und PowerShell
 
@@ -46,81 +47,80 @@ steht in [MdsTools.md](MdsTools.md), dort auch die Auftragsabwicklung unter Wind
 
 ## Verzeichnisstruktur
 
-Es gibt genau drei Bereiche:
+Es gibt genau zwei Bereiche. Sie sind **unabhängig voneinander** und haben keinen gemeinsamen Elternordner:
 
-| Bereich | Inhalt                                                                | Variable    |
-| ------- | --------------------------------------------------------------------- | ----------- |
-| Dev     | Einstiegspunkt; globale Verwaltungsskripte (CloneAll, PushAll, …)     | `$mdsDev`   |
-| Repos   | ausschließlich Git-Clones, jeder Unterordner = ein Repo (Kurzname)    | `$mdsRepos` |
-| Root    | Laufzeitumgebung `Bin`, `Config`, `Data`, `Logs`, `Temp` – nie in Git | `$mdsRoot`  |
+| Bereich | Inhalt                                                                                             | Variable    |
+| ------- | -------------------------------------------------------------------------------------------------- | ----------- |
+| Repos   | Git-Clones (jeder Unterordner = ein Repo, Kurzname) und die globalen Skripte (CloneAll, PushAll …) | `$mdsRepos` |
+| Root    | Laufzeitumgebung `Bin`, `Config`, `Data`, `Logs`, `Temp` – nie in Git                              | `$mdsRoot`  |
 
-Wie die Bereiche auf der Platte liegen, unterscheidet sich zwischen macOS und Windows.
+Wo die Bereiche auf der Platte liegen, unterscheidet sich zwischen macOS und Windows; das Modell ist gleich.
 
-### macOS (LUNA): Hierarchie unter `~/Dev`
+> Bis MdsTools 8.2 gab es zusätzlich den Elternordner Dev (`$mdsDev`, `~/Dev`, `DEV_HOME`). Er entfällt ab 8.3.
 
-Ein einziger Anker im User-Ordner: `~/Dev` (Schreibweise immer genau so – Linux/HA-Server unterscheiden
+### macOS (LUNA)
+
+Beide Bereiche liegen direkt im User-Ordner (Schreibweise immer genau so – Linux/HA-Server unterscheiden
 Groß-/Kleinschreibung).
 
 ```text
-~/Dev/                # $mdsDev   (/Users/hubert/Dev)
+~/Repos/              # $mdsRepos (/Users/hubert/Repos)
    *.ps1              # globale Verwaltungsskripte – nicht in Git
-   Repos/             # $mdsRepos
-      Mds/            # MdsTools
-      Net/            # NetCoreLib2026
-      Maui/           # NetMauiApps
-      PHB/            # PythonHB
-   Root/              # $mdsRoot
-      Bin/            # ausführbare Tools, gebaute CLIs/Services (im PATH)
-      Config/         # Einstellungen, Secrets
-      Data/           # Laufzeitdaten der Services (HA-MCP, REST-Dienste)
-      Logs/           # Protokolle der Skripte und Services
-      Temp/           # Zwischendateien, jederzeit löschbar
+   Mds/               # MdsTools
+   Net/               # NetCoreLib2026
+   Maui/              # NetMauiApps
+   PHB/               # PythonHB
+
+~/Root/               # $mdsRoot  (/Users/hubert/Root)
+   Bin/               # ausführbare Tools, gebaute CLIs/Services (im PATH)
+   Config/            # Einstellungen, Secrets
+   Data/              # Laufzeitdaten der Services (HA-MCP, REST-Dienste)
+   Logs/              # Protokolle der Skripte und Services
+   Temp/              # Zwischendateien, jederzeit löschbar
+   Archiv/            # Sicherungen (z. B. von Uninstall.ps1)
 ```
 
-### Windows (MARS): flach unter `C:\woyCode`
+### Windows (MARS)
 
-Unter Windows stehen Dev und Repos **nicht in einer Hierarchie, sondern auf einer Verzeichnisebene**. Die
-Basis ist fest `C:\woyCode`; `$mdsDev` und `$mdsRepos` zeigen auf denselben Ordner, die Repos liegen direkt darin.
-
-Root liegt **auf Laufwerk D:**, wenn es eines gibt (MARS): `D:\Dev\Root`. Fehlen `D:\Dev\Root` oder die
-Laufzeitordner, legt MdsTools sie beim Laden an. Ohne Laufwerk D: liegt Root auf `C:\Dev\Root`.
+Repos liegen fest in `C:\woyCode`, direkt darin (zusammen mit den woy-Repos). Root liegt **auf Laufwerk D:**,
+wenn es eines gibt (MARS): `D:\Root`. Ohne Laufwerk D: liegt Root auf `C:\Root`. Fehlen Root oder die
+Laufzeitordner, legt MdsTools sie beim Laden an.
 
 ```text
-C:\woyCode\           # $mdsDev = $mdsRepos
+C:\woyCode\           # $mdsRepos
    *.ps1              # globale Verwaltungsskripte
    Mds\  Net\  Maui\  …   # Repos (Kurznamen), dazu die woy-Repos
 
-D:\Dev\Root\         # $mdsRoot (ohne Laufwerk D: C:\Dev\Root)
+D:\Root\              # $mdsRoot (ohne Laufwerk D: C:\Root)
    Bin\  Config\  Data\  Logs\  Temp\   # Laufzeitordner
 ```
 
-Folgen der flachen Struktur:
+Folgen:
 
 - Wer alle Repos braucht, darf nicht einfach alle Unterordner von `$mdsRepos` nehmen, sondern muss Repos erkennen
-  (z. B. an `.git` oder an `scripts/Make.ps1`).
+  (z. B. an `.git` oder an `scripts/Make.ps1`). Unter Windows liegen in `C:\woyCode` auch Ordner, die keine Repos sind.
 
 #### Ausnahme: Auftragsabwicklung (Legacy-Pfade)
 
 Die Auftragsabwicklung (Repo `Auf`) folgt der Trennung Repos/Root **nicht**. Ihre Pfade sind historisch gewachsen,
 es gibt keinen weiteren Rechner damit; sie sind deshalb fest und absolut eingetragen und nur unter Windows gesetzt:
 
-| Variable     | Pfad                 | Bedeutung                                                         |
-| ------------ | -------------------- | ----------------------------------------------------------------- |
-| `$mdsWoySrc` | `C:\woyCode\Auf`     | Quellen                                                           |
-| `$mdsWoyBin` | `C:\woyCode\Auf\Bin` | Ergebnis des Übersetzens (`mk auf`) – im Repo-Ordner, nicht in Git |
+| Variable     | Pfad                 | Bedeutung                                                                     |
+| ------------ | -------------------- | ----------------------------------------------------------------------------- |
+| `$mdsWoySrc` | `C:\woyCode\Auf`     | Quellen                                                                       |
+| `$mdsWoyBin` | `C:\woyCode\Auf\Bin` | Ergebnis des Übersetzens (`mk auf`) – im Repo-Ordner, nicht in Git            |
 | `$mdsWoyRun` | `D:\woySystems\Bin`  | installierte Programme; `D:\woySystems\InstallDir` ist das Ziel des Kopierens |
 
 `mk auf` baut daher nach `$mdsWoyBin` und **nicht** nach `$mdsBin`. Alle anderen Repos nutzen `$mdsBin`.
 
 ### Gegenüberstellung
 
-| Bereich              | macOS (LUNA)        | Windows (MARS)      |
-| -------------------- | ------------------- | ------------------- |
-| Dev                  | `/Users/hubert/Dev` | `C:\woyCode`        |
-| Repos                | `~/Dev/Repos`       | `C:\woyCode`        |
-| Root                 | `~/Dev/Root`        | `D:\Dev\Root` (ohne D: `C:\Dev\Root`) |
-| Bin … Temp           | `~/Dev/Root/<Name>` | `<Root>\<Name>`     |
-| Basis abgeleitet aus | `$HOME`             | fest eingetragen    |
+| Bereich              | macOS (LUNA)        | Windows (MARS)                                             |
+| -------------------- | ------------------- | ---------------------------------------------------------- |
+| Repos                | `~/Repos`           | `C:\woyCode`                                               |
+| Root                 | `~/Root`            | `D:\Root` (ohne D: `C:\Root`)                              |
+| Bin … Temp           | `~/Root/<Name>`     | `<Root>\<Name>`                                            |
+| Basis abgeleitet aus | `$HOME`             | fest eingetragen                                           |
 | Auftragsabwicklung   | –                   | `C:\woyCode\Auf\Bin`, `D:\woySystems` (Legacy, siehe oben) |
 
 ### Trennung ist Pflicht
@@ -133,12 +133,12 @@ es gibt keinen weiteren Rechner damit; sie sind deshalb fest und absolut eingetr
 
 ### Umlenken per Umgebungsvariable
 
-Regel: **`DEV_<NAME>` zeigt genau auf den Ordner `<Name>`** – `DEV_HOME`, `DEV_REPOS`, `DEV_ROOT`, `DEV_BIN`,
+Regel: **`DEV_<NAME>` zeigt genau auf den Ordner `<Name>`** – `DEV_REPOS`, `DEV_ROOT`, `DEV_BIN`,
 `DEV_CONFIG`, `DEV_DATA`, `DEV_LOGS`, `DEV_TEMP`. Untergeordnete Ordner folgen mit, sofern sie nicht selbst gesetzt
 sind (`DEV_ROOT` verschiebt auch `Bin`, `Config` …). Die Regel gilt auf beiden Systemen; ohne Umgebungsvariable
 gilt der Standard aus der Tabelle oben.
 
-> Bis 01.11.2026 stand `DEV_ROOT` für `~/Dev` (heute `DEV_HOME`).
+> Bis 01.11.2026 stand `DEV_ROOT` für `~/Dev`, danach `DEV_HOME`. Ab MdsTools 8.3 gibt es `DEV_HOME` nicht mehr.
 
 ## Repositories
 
@@ -163,13 +163,13 @@ Unter Windows liegen unter `C:\woyCode` zusätzlich weitere woy-Repos.
 Git ist der Ordnername egal. Die Verbindung zum Remote steht in `<Ordner>/.git/config`:
 
 ```powershell
-git -C ~/Dev/Repos/Net remote -v   # → NetCoreLib2026
+git -C ~/Repos/Net remote -v   # → NetCoreLib2026
 ```
 
 Klonen mit Kurzname:
 
 ```powershell
-git clone https://github.com/HubertBieder/NetCoreLib2026.git ~/Dev/Repos/Net
+git clone https://github.com/HubertBieder/NetCoreLib2026.git ~/Repos/Net
 ```
 
 Ein bestehender Ordner kann jederzeit umbenannt werden (vorher VS Code schließen). Danach Verweise prüfen:
@@ -181,7 +181,7 @@ Get-ChildItem $mdsRepos -Recurse -Include *.csproj,*.sln,*.slnx,*.props,*.code-w
 
 ### Repo-Tabelle für CloneAll / PushAll
 
-Die globalen Skripte (`Modul/Skripte/` in diesem Repo, installiert nach `$mdsDev`) arbeiten mit einer Tabelle
+Die globalen Skripte (`Modul/Skripte/` in diesem Repo, installiert nach `$mdsRepos`) arbeiten mit einer Tabelle
 GitHub-Repo → Kurzname. Vorhandene Repos werden per `pull --ff-only` aktualisiert statt gelöscht; bei lokalen
 Änderungen bricht das Skript mit Warnung ab.
 
@@ -221,9 +221,9 @@ Themen, die **Net, Maui und Auf gemeinsam** betreffen, werden an einer Stelle be
 **`Net/docs/`**. Die Repos verweisen von ihren Dateien (z. B. `Directory.Packages.props`) dorthin, statt das Thema je
 Repo zu wiederholen.
 
-| Datei                       | Inhalt                                                     | Prüfen           |
-| --------------------------- | ---------------------------------------------------------- | ---------------- |
-| `Net/docs/NuGet-Sicherheit.md` | NuGet-Sicherheitslücken, Pins je Repo, Vorgehen          | `run net nuget`  |
+| Datei                          | Inhalt                                          | Prüfen          |
+| ------------------------------ | ----------------------------------------------- | --------------- |
+| `Net/docs/NuGet-Sicherheit.md` | NuGet-Sicherheitslücken, Pins je Repo, Vorgehen | `run net nuget` |
 
 ### Versionierung im Code
 
@@ -264,10 +264,71 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
 
 ## Offene Punkte
 
-- C#: Der Konstruktor von `xBase.BaseRoot` muss ohne Eingabe die Standards für Windows (`C:\woyCode`, flach) bzw.
-  macOS (`~/Dev`, Hierarchie) setzen; wird ein Pfad übergeben, werden die Ordner daraus abgeleitet.
+- C# (NetCoreLib2026) an MdsTools 8.3 anpassen: `xBase.BasePfad`/`BaseRoot` setzen ohne Eingabe Repos und Root
+  unabhängig (Windows `C:\woyCode`, `D:\Root` bzw. `C:\Root`; macOS `~/Repos`, `~/Root`), `DEV_HOME` entfällt.
+  Betroffen sind auch `FritzConfig`, `ImageToolsConfig`, `GlobalConfig` (TaskScheduler) und `ServiceInstaller`
+  (launchd-plist setzt `DEV_HOME`).
 - Altes Repo mdsPackage entfernen, sobald MdsTools auf LUNA und MARS läuft. Stand 03.11.2026: auf MARS nicht mehr
   installiert (Reste unter `C:\woyCode\_Alt\mdsPackage`); LUNA steht noch aus.
 - Programmcode in `Auf` setzt noch `Import-Module mdsPackage` voraus (AdminControl `PSDesktopLink.cs` und
   `DesktopIcons.json`, woyControlCenter `UpdateServer.KorrigierePowerShellLinks`, `xBase/PROCESS.cs`) – Umstellung
   offen, betrifft auch Kundenrechner.
+
+## Umstellung auf MdsTools 8.3 (Dev entfällt)
+
+Rezept für den Umzug von `~/Dev/Repos` und `~/Dev/Root` auf die unabhängigen Ordner `~/Repos` und `~/Root`
+(LUNA) bzw. von `D:\Dev\Root` auf `D:\Root` (MARS). Die Net-Änderung kommt **vor** dem Stoppen der Dienste, damit
+die Dienste nur für Umzug, Bauen und Installieren stillstehen.
+
+### Vorher (Dienste laufen weiter)
+
+1. NetCoreLib2026 auf 8.3 umstellen (siehe [Offene Punkte](#offene-punkte)): `BasePfad`/`BaseRoot`, `FritzConfig`,
+   `ImageToolsConfig`, `GlobalConfig`, `ServiceInstaller` (plist ohne `DEV_HOME`). Net und Mds committen und pushen.
+
+### LUNA (macOS)
+
+1. Dienste stoppen und die alten launchd-plists entfernen (sie enthalten noch `DEV_HOME=~/Dev`).
+2. Ordner umziehen:
+
+   ```bash
+   mv ~/Dev/Repos ~/Repos
+   mv ~/Dev/Root ~/Root
+   mv ~/Dev/Archiv ~/Root/Archiv
+   ```
+
+3. `DEV_HOME` entfernen, falls gesetzt (Shell-Profil, launchd).
+4. Neue Shell, MdsTools aktualisieren und installieren – erst danach zeigt `$mdsBin` auf `~/Root/Bin`:
+
+   ```powershell
+   cd ~/Repos/Mds
+   git pull
+   ./Install.ps1
+   ```
+
+5. Neue Shell, `Show-Mds` prüfen: `mdsRepos` und `mdsRoot` mit Quelle `Standard` und `Vorhanden = True`.
+6. Config auf alte absolute Pfade prüfen (der Umzug korrigiert sie nicht):
+
+   ```powershell
+   Get-ChildItem ~/Root/Config -Recurse -File | Select-String '/Dev/'
+   ```
+
+7. Net aktualisieren und die Dienste bauen (Ziel `~/Root/Bin/Net/<Programm>`):
+
+   ```powershell
+   go net
+   git pull
+   mk net <Dienst>
+   ```
+
+8. Dienste neu installieren (`--install`, auch mit sudo); der `ServiceInstaller` schreibt die neue plist.
+9. Prüfen, dass die Dienste laufen und Config, Data und Logs unter `~/Root` verwenden (neue Logdateien in
+   `~/Root/Logs`).
+10. `Invoke-Pester ./tests` in `~/Repos/Mds`; danach die alten `~/Dev/*.ps1` und den leeren Ordner `~/Dev` löschen.
+
+### MARS (Windows)
+
+1. Den Inhalt von `D:\Dev\Root` nach `D:\Root` verschieben, **bevor** das Modul neu geladen wird (sonst legt
+   MdsTools ein leeres `D:\Root` an).
+2. `cd C:\woyCode\Mds`, `git pull`, `./Install.ps1`, neue Shell, `Show-Mds` prüfen (Root `D:\Root`).
+3. Config wie oben auf `\Dev\` prüfen; Programme, die nach `$mdsBin` bauen, neu bauen.
+4. Den leeren Ordner `D:\Dev` löschen.

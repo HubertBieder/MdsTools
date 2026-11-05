@@ -11,7 +11,7 @@
       3. Profildateien sichern und entfernen:
            mdsProfile.ps1                 immer
            profile.ps1                    nur, wenn es mdsPackage oder MdsTools laedt
-      Die Sicherung liegt unter <Dev>/Archiv/Uninstall-<Datum-Uhrzeit>.
+      Die Sicherung liegt unter <Root>/Archiv/Uninstall-<Datum-Uhrzeit>.
     Modulordner in maschinenweiten Pfaden werden nur gemeldet, nicht geloescht.
     Danach kann mit Install.ps1 neu installiert werden.
 
@@ -28,6 +28,7 @@
     1.0.0    2026-10-31  Hubi/Claude   Erste Version (MdsTools.md, Schritt 6)
     1.0.1    2026-11-01  Hubi/Claude   DEV_HOME statt DEV_ROOT
     1.1.0    2026-11-04  Hubi/Claude   Kopf-/Schlusszeile mit Modulversion
+    1.2.0    2026-11-05  Hubi/Claude   Sicherung unter <Root>/Archiv statt <Dev>/Archiv (DEV_HOME entfaellt, 8.3)
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -41,8 +42,13 @@ $ModulVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'Modul/MdsTo
 . (Join-Path $PSScriptRoot 'InstallHelper.ps1')
 
 $moduleNames = if ($KeepMdsTools) { @('mdsPackage') } else { @('mdsPackage', 'MdsTools') }
-$devDir = if ($env:DEV_HOME) { $env:DEV_HOME } else { Join-Path (Get-UserHome) 'Dev' }
-$backupDir = Join-Path $devDir "Archiv/Uninstall-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+# Root wie InitModule.ps1 (das Modul ist hier evtl. nicht geladen): DEV_ROOT, sonst
+# Windows D:\Root bzw. C:\Root, macOS/Linux ~/Root.
+$rootDir = if ($env:DEV_ROOT) { $env:DEV_ROOT }
+elseif (-not $IsWindows) { Join-Path (Get-UserHome) 'Root' }
+elseif (Test-Path -LiteralPath 'D:\' -PathType Container) { 'D:\Root' }
+else { 'C:\Root' }
+$backupDir = Join-Path $rootDir "Archiv/Uninstall-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 
 # Verschiebt eine Datei in den Sicherungsordner (statt sie zu loeschen).
 function Move-ToBackup {
