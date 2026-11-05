@@ -12,6 +12,7 @@
 | 2026-11-03 | 1.1     | Hubert Bieder/Claude | Windows: Root auf `D:\Dev\Root`, ohne Laufwerk D: auf `C:\Dev\Root`                                       |
 | 2026-11-03 | 1.2     | Hubert Bieder/Claude | Ausnahme Auftragsabwicklung (Legacy-Pfade), Repo `Auf`, Init/Post nur bei vollem Lauf, Doku in `Net/docs` |
 | 2026-11-05 | 1.3     | Hubert Bieder/Claude | Repos und Root unabhängig (`~/Repos`, `~/Root`; `C:\woyCode`, `D:\Root`); Dev entfällt (MdsTools 8.3); Umstellungsrezept |
+| 2026-11-05 | 1.4     | Hubert Bieder/Claude | Offene Punkte: C# auf 8.3 und mdsPackage erledigt, `Auf` präzisiert; Rezept LUNA mit Befehlen (MdsTools 8.3.1) |
 
 ## Inhalt und Abgrenzung
 
@@ -264,15 +265,25 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
 
 ## Offene Punkte
 
-- C# (NetCoreLib2026) an MdsTools 8.3 anpassen: `xBase.BasePfad`/`BaseRoot` setzen ohne Eingabe Repos und Root
-  unabhängig (Windows `C:\woyCode`, `D:\Root` bzw. `C:\Root`; macOS `~/Repos`, `~/Root`), `DEV_HOME` entfällt.
-  Betroffen sind auch `FritzConfig`, `ImageToolsConfig`, `GlobalConfig` (TaskScheduler) und `ServiceInstaller`
-  (launchd-plist setzt `DEV_HOME`).
-- Altes Repo mdsPackage entfernen, sobald MdsTools auf LUNA und MARS läuft. Stand 03.11.2026: auf MARS nicht mehr
-  installiert (Reste unter `C:\woyCode\_Alt\mdsPackage`); LUNA steht noch aus.
 - Programmcode in `Auf` setzt noch `Import-Module mdsPackage` voraus (AdminControl `PSDesktopLink.cs` und
-  `DesktopIcons.json`, woyControlCenter `UpdateServer.KorrigierePowerShellLinks`, `xBase/PROCESS.cs`) – Umstellung
-  offen, betrifft auch Kundenrechner.
+  `DesktopIcons.json`, woyControlCenter `UpdateServer.KorrigierePowerShellLinks`, `xBase/PROCESS.cs`,
+  woyLib `StartPowerShell.cs`) – Umstellung offen, betrifft auch Kundenrechner. Die Desktop-Symbole rufen Cmdlets
+  der Auftragsabwicklung auf (`Invoke-ArtImportDownload`, `Invoke-XRechnung`, `Invoke-Backup` …), die MdsTools
+  **nicht** enthält. Vor der Umstellung ist zu entscheiden, welches Modul diese Cmdlets auf Kundenrechnern
+  bereitstellt; erst dann wird `ImportCmd` in `PSDesktopLink.cs`/`UpdateServer.cs` ersetzt.
+- Umzug LUNA und MARS nach [Umstellung auf MdsTools 8.3](#umstellung-auf-mdstools-83-dev-entfällt) (braucht `sudo`
+  bzw. Admin, Dienste stehen kurz still).
+
+Erledigt:
+
+- 05.11.2026: C# an MdsTools 8.3 angepasst (NetCoreLib2026 `68659b52`, NetMauiApps `8c04d99`). `xBase.BasePfad`/
+  `BaseRoot` setzen Repos und Root unabhängig (`DEV_REPOS` bzw. `~/Repos`, `C:\woyCode`; `DEV_ROOT` bzw. `~/Root`,
+  `D:\Root`/`C:\Root`), `Dev`, `DEV_HOME` und der Konstruktor mit Dev-Pfad entfallen (neu: `repos`, `root`,
+  `config`). Ebenso `FritzConfig`, `ImageToolsConfig`, `GlobalConfig` (RepoRoot, MachineDefault),
+  `ServiceInstaller` (plist setzt `DEV_ROOT=~/Root`), TaskScheduler und TaskAdmin (prüfen `Root` statt `Dev`).
+- 05.11.2026: mdsPackage ist auf LUNA und MARS nicht mehr installiert, `Repos/mdsPackage` gibt es nicht mehr
+  (E3 in [MdsTools-Migration.md](MdsTools-Migration.md)). Reste auf MARS unter `C:\woyCode\_Alt\mdsPackage`;
+  das GitHub-Repo bleibt für die Kundenrechner (siehe oben) erhalten.
 
 ## Umstellung auf MdsTools 8.3 (Dev entfällt)
 
@@ -282,18 +293,26 @@ die Dienste nur für Umzug, Bauen und Installieren stillstehen.
 
 ### Vorher (Dienste laufen weiter)
 
-1. NetCoreLib2026 auf 8.3 umstellen (siehe [Offene Punkte](#offene-punkte)): `BasePfad`/`BaseRoot`, `FritzConfig`,
-   `ImageToolsConfig`, `GlobalConfig`, `ServiceInstaller` (plist ohne `DEV_HOME`). Net und Mds committen und pushen.
+1. ~~NetCoreLib2026 auf 8.3 umstellen~~ – erledigt 05.11.2026 (Net `68659b52`, Maui `8c04d99`, siehe
+   [Offene Punkte](#offene-punkte)).
 
 ### LUNA (macOS)
 
-1. Dienste stoppen und die alten launchd-plists entfernen (sie enthalten noch `DEV_HOME=~/Dev`).
+1. Dienste stoppen und die alte launchd-plist entfernen (sie enthält noch `DEV_HOME=~/Dev`). Der TaskScheduler
+   startet die RestServices (AufAPI, MusterAPI); sie laufen aus `~/Dev/Root/Bin/Rest` und werden mit beendet:
+
+   ```bash
+   sudo launchctl bootout system /Library/LaunchDaemons/de.bieders.taskscheduler.plist
+   sudo rm /Library/LaunchDaemons/de.bieders.taskscheduler.plist
+   pgrep -fl /Dev/Root/Bin    # muss leer sein, sonst: pkill -f /Dev/Root/Bin
+   ```
+
 2. Ordner umziehen:
 
    ```bash
    mv ~/Dev/Repos ~/Repos
    mv ~/Dev/Root ~/Root
-   mv ~/Dev/Archiv ~/Root/Archiv
+   [ -d ~/Dev/Archiv ] && mv ~/Dev/Archiv ~/Root/Archiv
    ```
 
 3. `DEV_HOME` entfernen, falls gesetzt (Shell-Profil, launchd).
@@ -306,21 +325,35 @@ die Dienste nur für Umzug, Bauen und Installieren stillstehen.
    ```
 
 5. Neue Shell, `Show-Mds` prüfen: `mdsRepos` und `mdsRoot` mit Quelle `Standard` und `Vorhanden = True`.
-6. Config auf alte absolute Pfade prüfen (der Umzug korrigiert sie nicht):
+6. Config auf alte absolute Pfade prüfen und korrigieren (der Umzug korrigiert sie nicht). Stand 05.11.2026 betrifft
+   das `TaskScheduler/TaskScheduler.json` (SchedulerPath, DataRoot, Bin-/PWA-Ordner, Task MakeTaskScheduler),
+   `Invoices/TestInvoice.json`, `AdminRDM/AdminRDM.json` und `TaskAdmin/TaskAdmin.Config`:
 
    ```powershell
-   Get-ChildItem ~/Root/Config -Recurse -File | Select-String '/Dev/'
+   $alt = Get-ChildItem ~/Root/Config -Recurse -File -Exclude *.bak* | Select-String -List '/Dev/'
+   $alt.Path
+   foreach ($f in $alt.Path) {
+       Copy-Item $f "$f.bak-83"
+       (Get-Content -Raw $f) -replace '/Users/hubert/Dev/Root', '/Users/hubert/Root' `
+                             -replace '/Users/hubert/Dev/Repos', '/Users/hubert/Repos' | Set-Content -NoNewline $f
+   }
    ```
 
-7. Net aktualisieren und die Dienste bauen (Ziel `~/Root/Bin/Net/<Programm>`):
+7. Net und Maui aktualisieren und neu bauen (TaskScheduler und Tasks nach `~/Root/Bin/Task`, RestServices nach
+   `~/Root/Bin/Rest`; TaskAdmin aus Maui):
 
    ```powershell
-   go net
-   git pull
-   mk net <Dienst>
+   go net;  git pull; mk net +t; mk net +r
+   go maui; git pull; mk maui TaskAdmin
    ```
 
-8. Dienste neu installieren (`--install`, auch mit sudo); der `ServiceInstaller` schreibt die neue plist.
+8. Dienst neu installieren; der `ServiceInstaller` schreibt die neue plist mit `DEV_ROOT=~/Root`:
+
+   ```bash
+   sudo ~/Root/Bin/Task/TaskScheduler --install
+   sudo launchctl bootstrap system /Library/LaunchDaemons/de.bieders.taskscheduler.plist
+   ```
+
 9. Prüfen, dass die Dienste laufen und Config, Data und Logs unter `~/Root` verwenden (neue Logdateien in
    `~/Root/Logs`).
 10. `Invoke-Pester ./tests` in `~/Repos/Mds`; danach die alten `~/Dev/*.ps1` und den leeren Ordner `~/Dev` löschen.

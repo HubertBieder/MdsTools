@@ -37,6 +37,7 @@
 | 2026-11-04 | 0.31    | Hubert Bieder/Claude | `run mars`: MARS wecken (Wake-on-LAN) und Freigaben auf LUNA aktivieren                    |
 | 2026-11-04 | 0.32    | Hubert Bieder/Claude | `Update-PowerShell7.ps1/.cmd` (statt Install-…); `Update-PowerShell` installiert unter Windows nicht mehr selbst |
 | 2026-11-05 | 0.33    | Hubert Bieder/Claude | 8.3: Repos/Root unabhängig (`~/Repos`, `~/Root`, `D:\Root`); ohne `$mdsDev`, `go dev` |
+| 2026-11-05 | 0.34    | Hubert Bieder/Claude | 8.3.1: Offene Punkte in MDS-Development.md (C# auf 8.3, mdsPackage erledigt)            |
 
 ---
 
@@ -404,12 +405,12 @@ Umgebungsvariable den Ordner umlenkt, sonst `Standard`. Die erste Zeile `System`
 macOS arbeitet. Nur unter Windows folgen am Ende `mdsWoySrc`, `mdsWoyBin` und `mdsWoyRun` (Quelle `Legacy (fest)`).
 
 ```text
-*----  MdsTools 8.3.0 | woy 0 | PowerShell 7.6.9 | macOS  -------
+*----  MdsTools 8.3.1 | woy 0 | PowerShell 7.6.9 | macOS  -------
 
 Variable   Wert                          Quelle        Vorhanden
 --------   ----                          ------        ---------
 System     macOS                         IsMacOS
-mdsVersion 8.3.0                         MdsTools.psd1
+mdsVersion 8.3.1                         MdsTools.psd1
 mdsWoy     0                             macOS
 mdsRepos   /Users/hubert/Repos           Standard      True
 mdsRoot    /Users/hubert/Root            Standard      True
