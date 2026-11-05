@@ -35,6 +35,7 @@
 | 2026-11-04 | 0.29    | Hubert Bieder/Claude | `Install-PowerShell7.ps1/.cmd` (Windows, 5.1) gehört zum Repo; Install/Uninstall zeigen die Modulversion |
 | 2026-11-04 | 0.30    | Hubert Bieder/Claude | 8.2.2: `Show-Repos`; erste Zeile der README.md `# <Name> – <Kurzbeschreibung>`                |
 | 2026-11-04 | 0.31    | Hubert Bieder/Claude | `run mars`: MARS wecken (Wake-on-LAN) und Freigaben auf LUNA aktivieren                    |
+| 2026-11-05 | 0.32    | Hubert Bieder/Claude | 8.3: Repos/Root unabhängig (`~/Repos`, `~/Root`, `D:\Root`); ohne `$mdsDev`, `go dev` |
 
 ---
 
@@ -64,8 +65,8 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 
 | Begriff       | Bedeutung                                                                  |
 | ------------- | -------------------------------------------------------------------------- |
-| mdsPackage    | Bisheriges PowerShell-Modul unter `~/Dev/Repos/mdsPackage` (Version 7.0)   |
-| MdsTools      | Neues Modul, Nachfolger von mdsPackage, Repo-Ordner `~/Dev/Repos/Mds`      |
+| mdsPackage    | Bisheriges PowerShell-Modul unter `~/Repos/mdsPackage` (Version 7.0)       |
+| MdsTools      | Neues Modul, Nachfolger von mdsPackage, Repo-Ordner `~/Repos/Mds`          |
 | woy           | Altes Auftragsprogramm samt Infrastruktur – wird nicht weiterentwickelt    |
 | Auftrag (MDS) | Auftragsabwicklung auf Basis von woy/mdsProfile – **nur unter Windows**    |
 | Kurzname      | Ordnername eines Repos unter `Repos/` (z. B. `Net`, `Maui`), Ziel für `go` |
@@ -96,7 +97,7 @@ wie `Resolve-MdsPath` müssen nicht exportiert werden. mdsPackage musste sie weg
 global machen.
 
 ```text
-~/Dev/Repos/Mds/
+~/Repos/Mds/
    README.md
    MDS-Development.md          # Systematik der Entwicklungsumgebung
    MdsTools.md                 # diese Beschreibung
@@ -124,7 +125,7 @@ global machen.
          MdsSkripte/           # *.ps1 – woy/Auftrag (aus mdsProfile.ps1), nur Windows
             InitMDS.ps1        # lädt alle MdsSkripte
             WoyEnv.ps1         # Get-WoyValue, Get-WoyCredential (woy.env)
-      Skripte/                 # globale Skripte (CloneAll, PushAll, …) → $mdsDev
+      Skripte/                 # globale Skripte (CloneAll, PushAll, …) → $mdsRepos
    Profile/
       profile.ps1              # wird nach $PROFILE kopiert
    scripts/                    # globale run-Skripte (_backup.ps1), gelten in allen Repos
@@ -132,7 +133,7 @@ global machen.
    PSScriptAnalyzerSettings.psd1  # bewusst ausgeschlossene Analyzer-Regeln
 ```
 
-`Modul/Skripte/` wird von `Install.ps1` nach `$mdsDev` kopiert, aber nur, wenn die Quelle neuer ist.
+`Modul/Skripte/` wird von `Install.ps1` nach `$mdsRepos` kopiert, aber nur, wenn die Quelle neuer ist.
 
 ## Initialisierung und Ablauf
 
@@ -144,7 +145,7 @@ global machen.
 
 ## Globale Variablen
 
-`Skripte/InitModule.ps1` setzt die Variablen beim Laden des Moduls. Die Verzeichnislogik dahinter (Hierarchie
+`Skripte/InitModule.ps1` setzt die Variablen beim Laden des Moduls. Die Verzeichnislogik dahinter (Repos und Root
 unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 [MDS-Development.md](MDS-Development.md#verzeichnisstruktur).
 
@@ -152,16 +153,15 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | ------------- | ------------------- | ------------------- | -------------------------------------------- |
 | `$mdsVersion` | `8.x` aus Manifest  | `8.x` aus Manifest  | Modulversion, auf allen Systemen gleich (A2) |
 | `$mdsWoy`     | `0`                 | `26`                | woy-Stand des Systems, `[int]`               |
-| `$mdsDev`     | `/Users/hubert/Dev` | `C:\woyCode`        | Einstiegspunkt, Ziel von `go dev`            |
-| `$mdsRepos`   | `$mdsDev/Repos`     | `C:\woyCode`        | Git-Clones, Ziel von `go repos`              |
-| `$mdsRoot`    | `$mdsDev/Root`      | `D:\Dev\Root` ¹     | Laufzeitumgebung, Ziel von `go root`         |
+| `$mdsRepos`   | `~/Repos`           | `C:\woyCode`        | Git-Clones, Ziel von `go` und `go repos`     |
+| `$mdsRoot`    | `~/Root`            | `D:\Root` ¹         | Laufzeitumgebung, Ziel von `go root`         |
 | `$mdsBin`     | `$mdsRoot/Bin`      | `$mdsRoot\Bin`      | gebaute Programme, steht im `PATH`           |
 | `$mdsConfig`  | `$mdsRoot/Config`   | `$mdsRoot\Config`   | Konfiguration je Programm                    |
 | `$mdsData`    | `$mdsRoot/Data`     | `$mdsRoot\Data`     | Laufzeitdaten der Services                   |
 | `$mdsLogs`    | `$mdsRoot/Logs`     | `$mdsRoot\Logs`     | Protokolle                                   |
 | `$mdsTemp`    | `$mdsRoot/Temp`     | `$mdsRoot\Temp`     | Zwischendateien, Freigabe-Mounts (macOS)     |
 
-¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\Dev\Root`. Fehlende Ordner legt MdsTools beim Laden an.
+¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\Root`. Fehlende Ordner legt MdsTools beim Laden an.
 
 Nur unter Windows gibt es zusätzlich die **Legacy-Adressen der Auftragsabwicklung**. Sie sind fest und absolut
 (es gibt keinen weiteren Rechner mit woy), werden nicht umgelenkt und nicht angelegt; unter macOS fehlen sie.
@@ -177,10 +177,12 @@ Die Hilfsfunktionen dazu (`Clear-WoyProcess`, `Write-WoyVersionCS`, `Write-Datei
 
 - `$mdsWoy` ist bewusst ein Integer: Skripte können `if ($mdsWoy -ge 26)` oder `if (-not $mdsWoy)` prüfen.
   Der Wert 26 steht in `InitModule.ps1` als Konstante.
-- Jeder Ordner lässt sich mit `DEV_<NAME>` umlenken (`DEV_HOME` → `$mdsDev`, `DEV_REPOS` → `$mdsRepos`,
+- Jeder Ordner lässt sich mit `DEV_<NAME>` umlenken (`DEV_REPOS` → `$mdsRepos`,
   `DEV_ROOT` → `$mdsRoot`, `DEV_BIN` … `DEV_TEMP`); Regel siehe
   [MDS-Development.md](MDS-Development.md#umlenken-per-umgebungsvariable).
-- Die C#-Klasse `xBase.BaseRoot` in NetCoreLib2026 verwendet dieselbe Logik.
+- Die C#-Klasse `xBase.BaseRoot` in NetCoreLib2026 verwendet dieselbe Logik (Anpassung an 8.3 offen, siehe
+  [MDS-Development.md](MDS-Development.md#offene-punkte)).
+- Bis 8.2 gab es zusätzlich `$mdsDev` (`~/Dev`, `DEV_HOME`, `go dev`); ab 8.3 entfällt der gemeinsame Elternordner.
 
 ## Befehle
 
@@ -202,22 +204,21 @@ Arguments spielt keine Rolle.
 
 | Aufruf      | Ziel                                                         |
 | ----------- | ------------------------------------------------------------ |
-| `go`        | `$mdsDev`                                                    |
-| `go dev`    | `$mdsDev`                                                    |
+| `go`        | `$mdsRepos` (wie `go repos`)                                 |
 | `go repos`  | `$mdsRepos`                                                  |
 | `go root`   | `$mdsRoot`                                                   |
 | `go <Kurz>` | `$mdsRepos/<Kurz>` (z. B. `go net`), nur Ordner mit `.git`   |
 
-- Die Namen `dev`, `repos` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
-- Unter Windows führen `go`, `go dev` und `go repos` nach `C:\woyCode`, `go root` nach `D:\Dev\Root`
-  (ohne Laufwerk D: nach `C:\Dev\Root`).
+- Die Namen `repos` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
+- Unter Windows führen `go` und `go repos` nach `C:\woyCode`, `go root` nach `D:\Root`
+  (ohne Laufwerk D: nach `C:\Root`).
 - Außer den festen Zielen springt `go` nur in Ordner unter `$mdsRepos`, die ein `.git` enthalten. Unter Windows
   sind damit die Laufzeitordner (`Bin`, `Config`, …) ausgeschlossen, die woy-Repos der Auftragsabwicklung aber
   erreichbar; unter macOS gibt es diese nicht.
 - Die Tab-Vervollständigung der Kurznamen erfolgt über `Register-ArgumentCompleter`.
 - Ein unbekanntes Ziel erzeugt eine Warnung mit der Liste der gültigen Ziele.
 - Die Repo-Namen werden bei jedem Aufruf (auch bei jeder Tab-Vervollständigung) aus `$mdsRepos` gelesen, es gibt
-  keine Liste. Unter Windows (flach) erscheinen dadurch auch `Bin`, `Config` … als Ziele.
+  keine Liste.
 
 ### mk – Programme bauen
 
@@ -258,7 +259,7 @@ Der Ausgabeordner wird in dieser Reihenfolge bestimmt:
 
 1. Parameter `-OutDir` beim Aufruf (`mk maui TestTool -OutDir ~/Test`) – gilt nur für diesen Lauf.
 2. Eintrag `OutDir` in der Programmtabelle von `Make.ps1`.
-3. Standard: `$mdsBin/<Kurzname>/<Programm>/`, z. B. `~/Dev/Root/Bin/Net/TaskAPI/`.
+3. Standard: `$mdsBin/<Kurzname>/<Programm>/`, z. B. `~/Root/Bin/Net/TaskAPI/`.
 
 Ein relativer `OutDir` gilt relativ zu `$mdsBin`; ein absoluter Pfad wird unverändert übernommen. Fehlt der
 Ordner, legt `Make.ps1` ihn an.
@@ -402,15 +403,15 @@ Umgebungsvariable den Ordner umlenkt, sonst `Standard`. Die erste Zeile `System`
 macOS arbeitet. Nur unter Windows folgen am Ende `mdsWoySrc`, `mdsWoyBin` und `mdsWoyRun` (Quelle `Legacy (fest)`).
 
 ```text
-*----  MdsTools 8.2.1 | woy 0 | PowerShell 7.6.9 | macOS  -------
+*----  MdsTools 8.3.0 | woy 0 | PowerShell 7.6.9 | macOS  -------
 
 Variable   Wert                          Quelle        Vorhanden
 --------   ----                          ------        ---------
 System     macOS                         IsMacOS
-mdsVersion 8.2.1                         MdsTools.psd1
+mdsVersion 8.3.0                         MdsTools.psd1
 mdsWoy     0                             macOS
-mdsDev     /Users/hubert/Dev             Standard      True
-mdsRepos   /Users/hubert/Dev/Repos       Standard      True
+mdsRepos   /Users/hubert/Repos           Standard      True
+mdsRoot    /Users/hubert/Root            Standard      True
 …
 ```
 
@@ -624,7 +625,7 @@ MdsTools und die neuen Pfade umgestellt (siehe [MdsTools-Migration.md](MdsTools-
 
 ### Einrichten und Testen auf MARS
 
-- [ ] `Install.ps1` ausführen, neue Shell: `Show-Mds` zeigt `woy 26`, Dev/Repos `C:\woyCode`, Root `D:\Dev\Root`.
+- [ ] `Install.ps1` ausführen, neue Shell: `Show-Mds` zeigt `woy 26`, Repos `C:\woyCode`, Root `D:\Root`.
 - [ ] `%USERPROFILE%\.woy\woy.env` vorhanden und vollständig (`Get-WoyEnvPath`, `Get-WoyValue …`).
 - [ ] `Get-WoyCredential server` liefert eine Anmeldung.
 - [ ] `go`, `mk`, `run` in `C:\woyCode` (flache Struktur) prüfen.

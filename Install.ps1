@@ -7,7 +7,7 @@
     Laeuft unter PowerShell 7.6+ auf Windows (MARS) und macOS (LUNA).
       1. Modul/MdsTools      -> Benutzer-Modulordner (vorhandene Version wird ersetzt)
       2. Profile/profile.ps1 -> $PROFILE.CurrentUserAllHosts (vorher Sicherung *.bak)
-      3. Modul/Skripte/*.ps1 -> $mdsDev (nur wenn neuer); veraltete Skripte werden entfernt
+      3. Modul/Skripte/*.ps1 -> $mdsRepos (nur wenn neuer); veraltete Skripte werden entfernt
       4. nur Windows: ~/.woy/woy.env einrichten (woy-Anmeldedaten)
     Ist mdsPackage noch installiert, bricht das Skript ab: erst Uninstall.ps1 ausfuehren.
 
@@ -19,6 +19,7 @@
     5.1                  H. Bieder     Installation mdsPackage
     6.0.0    2026-10-31  Hubi/Claude   Umstellung auf MdsTools (MdsTools.md, Schritt 5)
     6.1.0    2026-11-04  Hubi/Claude   Globale Skripte aus Modul/Skripte; Kopf-/Schlusszeile mit Modulversion
+    6.2.0    2026-11-05  Hubi/Claude   Globale Skripte nach $mdsRepos ($mdsDev entfaellt, 8.3)
 #>
 [CmdletBinding()]
 param()
@@ -29,7 +30,7 @@ $ModulVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'Modul/MdsTo
 # Repo-Wurzel = Ordner dieses Skripts (unabhaengig vom aktuellen Verzeichnis).
 $script:RepoRoot = $PSScriptRoot
 
-# Skripte, die frueher nach $mdsDev kopiert wurden und entfallen sind (E9: UpdatePS.ps1 -> Update-PowerShell).
+# Skripte, die frueher nach $mdsDev/$mdsRepos kopiert wurden und entfallen sind (E9: UpdatePS.ps1 -> Update-PowerShell).
 $script:ObsoleteScripts = @('UpdatePS.ps1')
 
 # Gemeinsame Pfad-Helfer: Get-UserHome, Get-ProfileRoot, Get-CurrentUserModuleDir
@@ -83,21 +84,21 @@ function Copy-Profile() {
     Write-Host -ForegroundColor blue "===>   profile.ps1   <==="
 }
 
-# Kopiert die globalen Skripte nach $DevDir, wenn sie dort fehlen oder aelter sind,
+# Kopiert die globalen Skripte nach $ReposDir, wenn sie dort fehlen oder aelter sind,
 # und entfernt die nicht mehr gepflegten Skripte aus $script:ObsoleteScripts.
-function Copy-GlobalScripts([string] $DevDir) {
+function Copy-GlobalScripts([string] $ReposDir) {
     foreach ($skript in Get-ChildItem -LiteralPath (Join-Path $script:RepoRoot 'Modul/Skripte') -Filter '*.ps1' -File) {
-        $target = Join-Path $DevDir $skript.Name
+        $target = Join-Path $ReposDir $skript.Name
         if ((Test-Path -LiteralPath $target -PathType Leaf) -and
             ((Get-Item -LiteralPath $target).LastWriteTimeUtc -ge $skript.LastWriteTimeUtc)) {
             Write-Verbose "$($skript.Name) ist aktuell"
             continue
         }
         Copy-Item -LiteralPath $skript.FullName -Destination $target -Force
-        Write-Host -ForegroundColor blue "===>   $($skript.Name) ==> $DevDir   <==="
+        Write-Host -ForegroundColor blue "===>   $($skript.Name) ==> $ReposDir   <==="
     }
     foreach ($name in $script:ObsoleteScripts) {
-        $target = Join-Path $DevDir $name
+        $target = Join-Path $ReposDir $name
         if (Test-Path -LiteralPath $target -PathType Leaf) {
             Remove-Item -LiteralPath $target -Force
             Write-Host -ForegroundColor DarkYellow "Veraltetes Skript entfernt: $target"
@@ -160,9 +161,9 @@ if (-not (Install-MdsModule)) {
 }
 Copy-Profile
 
-# Modul laden: setzt $mdsDev und legt die Root-Ordner an (Skripte/InitModule.ps1).
+# Modul laden: setzt $mdsRepos/$mdsRoot und legt die Root-Ordner an (Skripte/InitModule.ps1).
 Import-Module MdsTools -Global -Force
-Copy-GlobalScripts -DevDir $mdsDev
+Copy-GlobalScripts -ReposDir $mdsRepos
 if ($IsWindows) {
     Install-WoyEnv
 }
@@ -173,6 +174,6 @@ Write-Host ""
 $modul = Get-Module MdsTools
 Write-Host "Modul:        MdsTools $($modul.Version)  ($($modul.ModuleBase))"
 Write-Host "Profil:       $(Join-Path (Get-ProfileRoot) 'profile.ps1')"
-Write-Host "mdsDev:       $mdsDev"
+Write-Host "mdsRepos:     $mdsRepos"
 Write-Host "mdsRoot:      $mdsRoot"
 Write-Host "Neue PowerShell-Sitzung starten, damit das Profil geladen wird."
