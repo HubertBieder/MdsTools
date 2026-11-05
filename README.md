@@ -28,7 +28,7 @@ denselben Befehlen:
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [MDS-Development.md](MDS-Development.md)       | **Systematik**: Systeme, PowerShell 7, Verzeichnisstruktur macOS/Windows, `DEV_<NAME>`, Repos und ihre Konventionen |
 | [MdsTools.md](MdsTools.md)                     | **Modul**: Aufbau, Variablen, `go`/`mk`/`run`/`Show-Mds`, Cmdlets, Auftragsabwicklung (Windows)                     |
-| [MdsTools-Migration.md](MdsTools-Migration.md) | Ablösung von mdsPackage: Motivation, Entscheidungen, Umsetzung, Umbenennungen                                       |
+| [Luna.md](Luna.md) / [Mars.md](Mars.md)        | **Offene Aufgaben**: erst allgemein und LUNA, danach MARS in einem Stück                                            |
 
 ## Schnellstart
 
@@ -71,7 +71,7 @@ Mds/
    README.md                  # diese Einführung
    MDS-Development.md         # Systematik der Entwicklungsumgebung
    MdsTools.md                # Beschreibung des Moduls
-   MdsTools-Migration.md      # Ablösung von mdsPackage
+   Luna.md / Mars.md          # offene Aufgaben: erst Luna, dann Mars
    Install.ps1 / Uninstall.ps1 / InstallHelper.ps1
    Update-PowerShell7.ps1/.cmd   # nur Windows: PowerShell 7 prüfen/installieren (läuft unter 5.1)
    Modul/MdsTools/            # das Modul (Manifest, SkriptModule, MdsSkripte)

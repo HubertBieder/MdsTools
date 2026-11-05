@@ -2,3 +2,6 @@
 
 # Logdateien (Make)
 **/log/
+
+# Rechnerlokale Anmeldedaten (Vorlage .env.example ist eingecheckt)
+.env

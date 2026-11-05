@@ -8,6 +8,7 @@
 #               30.10.2026 macOS: cdBin -> woyRoot/Bin, cdAuf/2Auf nur Windows, Conda-Hinweis
 #               31.10.2026 Hubi/Claude: Umstellung auf MdsTools; cd*/2*-Aliase durch go ersetzt,
 #                          woy-Variablen durch $mds*, zip-Alias entfernt (verdeckte /usr/bin/zip)
+#               05.11.2026 Hubi/Claude: prompt zeigt den User-Ordner als ~ (PS ~/Repos>)
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -45,6 +46,16 @@ function Use-Conda() {
             Write-Warning "Conda ist auf macOS (noch) nicht installiert"
         }
     }
+}
+
+# 2026-11-05 Hubi/Claude: Prompt wie der Standard, aber $HOME als ~ (PS ~/Repos/Mds>)
+function prompt {
+    $p = $PWD.Path
+    if ($PWD.Provider.Name -eq 'FileSystem' -and
+        ($p -eq $HOME -or $p.StartsWith($HOME + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase))) {
+        $p = '~' + $p.Substring($HOME.Length)
+    }
+    "PS $p$('>' * ($NestedPromptLevel + 1)) "
 }
 
 function Show-Header([string] $os) {

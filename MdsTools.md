@@ -38,6 +38,7 @@
 | 2026-11-04 | 0.32    | Hubert Bieder/Claude | `Update-PowerShell7.ps1/.cmd` (statt Install-…); `Update-PowerShell` installiert unter Windows nicht mehr selbst |
 | 2026-11-05 | 0.33    | Hubert Bieder/Claude | 8.3: Repos/Root unabhängig (`~/Repos`, `~/Root`, `D:\Root`); ohne `$mdsDev`, `go dev` |
 | 2026-11-05 | 0.34    | Hubert Bieder/Claude | 8.3.1: Offene Punkte in MDS-Development.md (C# auf 8.3, mdsPackage erledigt)            |
+| 2026-11-05 | 0.35    | Hubert Bieder/Claude | MdsTools-Migration.md entfernt (abgeschlossen); Umbenennungen hierher; offene Punkte in Luna.md/Mars.md |
 
 ---
 
@@ -58,8 +59,6 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 
 - [README.md](README.md) – Einführung in dieses Repo
 - [MDS-Development.md](MDS-Development.md) – Systematik der Entwicklungsumgebung
-- [MdsTools-Migration.md](MdsTools-Migration.md) – Ablösung von mdsPackage (Motivation, Entscheidungen,
-  Umsetzung, Umbenennungen)
 - `C:\woyCode\Net\docs\NuGet-Sicherheit.md` – NuGet-Sicherheitslücken und Pins, zentral für Net, Maui und Auf
   (Prüfen: `run net nuget`)
 
@@ -81,7 +80,7 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 | A2  | Die Modulversion wird **zentral** im Manifest `MdsTools.psd1` festgelegt; `$mdsVersion` liest sie aus.                                                      |
 | A3  | `Install.ps1` in der Repo-Root installiert das Modul, das Profil und die globalen Skripte.                                                                  |
 | A4  | `Uninstall.ps1` in der Repo-Root entfernt alte Installationen von mdsPackage und MdsTools.                                                                  |
-| A5  | Übernommene Cmdlets behalten ihren Namen, außer den Einträgen unter [Umbenennungen](MdsTools-Migration.md#umbenennungen).                                   |
+| A5  | Übernommene Cmdlets behalten ihren Namen, außer den Einträgen unter [Umbenennungen](#umbenennungen).                                                         |
 | A6  | Funktionen für woy und Auftragsabwicklung kommen als einzelne `*.ps1` nach `MdsSkripte`. Das JSON-Verfahren (`*.mds`) entfällt (8.2).        |
 | A7  | Alle übrigen Funktionen kommen thematisch gruppiert in `*.ps1`-Dateien unter `SkriptModule`; `MdsTools.psm1` lädt sie per Dot-Sourcing in den Modulbereich. |
 | A8  | Nur Funktionen, die von außen gebraucht werden, werden exportiert; alles andere bleibt intern.                                                              |
@@ -103,7 +102,7 @@ global machen.
    README.md
    MDS-Development.md          # Systematik der Entwicklungsumgebung
    MdsTools.md                 # diese Beschreibung
-   MdsTools-Migration.md       # Ablösung von mdsPackage
+   Luna.md / Mars.md           # offene Aufgaben: erst Luna, dann Mars
    Install.ps1                 # Installation (analog mdsPackage)
    Uninstall.ps1               # entfernt alte Installationen (bisher "clear.ps1")
    InstallHelper.ps1           # gemeinsame Pfad-Helfer für Install.ps1 und Uninstall.ps1
@@ -444,7 +443,7 @@ mk             Baut Programme eines Repos über $mdsRepos/<Repo>/scripts/…   N
 Grundlage ist die Exportliste von mdsPackage, ausgewertet mit einer Suche nach Aufrufen in den Repos
 `Net`, `Maui`, `PHB`, in den globalen Skripten und in `mdsProfile.ps1`.
 
-Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](MdsTools-Migration.md#umbenennungen)).
+Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](#umbenennungen)).
 
 | Funktion                                                         | Bisher in | Ziel             | Export | Begründung                                                                             |
 | ---------------------------------------------------------------- | --------- | ---------------- | ------ | -------------------------------------------------------------------------------------- |
@@ -466,6 +465,31 @@ Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](MdsTools-Mi
 | `Write-Error`                                                    | –         | **entfällt**     | –      | eingebautes Cmdlet, darf nicht überschrieben werden                                    |
 | `Backup-Develop`, `Get-OneDriveRoot`                             | FileIO    | `FileIO.ps1`     | ja     | waren als `global:` definiert; macOS ergänzt (OneDrive unter `~/Library/CloudStorage`) |
 
+### Umbenennungen
+
+Diese Cmdlets und Funktionen erhalten in MdsTools einen neuen Namen. Aliase für die alten Namen gibt es nicht,
+da mdsPackage und MdsTools nie gleichzeitig geladen werden.
+
+| Alter Name        | Neuer Name        | Grund                                                         |
+| ----------------- | ----------------- | ------------------------------------------------------------- |
+| `Build-Projects`  | `Build-Project`   | PowerShell empfiehlt Substantive im Singular                  |
+| `Limit-Files`     | `Remove-OldFile`  | Zweck erkennbar: behält die neuesten n Dateien, löscht ältere |
+| `Get-ZipEntries`  | `Get-ZipEntry`    | Singular                                                      |
+| `Show-Powershell` | `Show-PowerShell` | Schreibweise                                                  |
+| `Find-csProj`     | `Find-CsProj`     | Schreibweise                                                  |
+| `Publish-NET`     | `Publish-DotNet`  | Schreibweise, einheitlich zu `Update-DotNet`                  |
+| `GetLogDir`       | `Get-LogDir`      | Verb-Substantiv-Schema (intern)                               |
+| `IsInPattern`     | `Test-InPattern`  | Verb-Substantiv-Schema (intern)                               |
+| `IsMauiExe`       | `Test-MauiExe`    | Verb-Substantiv-Schema (intern)                               |
+
+### Nicht übernommene Funktionen von mdsPackage
+
+- **Git** (`GitUtil.psm1`: `Invoke-Commit`, `Invoke-Push`, `Show-Git*`, `Get-GitRepos` …): entfällt, `git` direkt verwenden.
+- **JSON-Verfahren** (`New-Package`, `Read-PackageDefinition`, `Invoke-PackageBuild`, `Get-PackageTargetDirs`,
+  `Show-MdsPackage`, `Get-MDS`, `Test-Package`): entfällt ab 8.2 ganz, `*.mds`-Dateien werden nicht mehr unterstützt.
+- **woy** (`Enable-WoyTls`, `Get-UncShareRoot`): wandert nach `MdsSkripte`.
+- **Intern** (`Test-IsAdmin`, `Assert-Admin`, `Start-Spinner`, `Initialize-LogFile` …): werden mit übernommen,
+  aber nicht exportiert.
 ### Copy-FileWithCredential / Copy-FolderWithCredential
 
 Beide Funktionen sind heute nur unter Windows lauffähig. Für den Einsatz auf dem Mac sind drei Änderungen nötig:
@@ -621,28 +645,17 @@ Tagesarchiv `Auf_yyyyMMdd.zip` wird überschrieben, am Ende stehen Pfad und Grö
 Die Deploy-Skripte in `Net/scripts/Windows` (`Make-TaskAPI`, `Make-RestSRV`, `Make-AufAPI`, `Make-My*`,
 `Make-TaskScheduler`, `Make-Rebuild`) stoppen/starten Dienste und IIS und werden aus Programmen aufgerufen
 (`TaskAdminConfig.RebuildScript`, `GlobalConfig.cs`). Sie gehen nicht in `Make.ps1` auf, sondern werden auf
-MdsTools und die neuen Pfade umgestellt (siehe [MdsTools-Migration.md](MdsTools-Migration.md#umsetzung), Schritt 7).
+MdsTools und die neuen Pfade umgestellt. Die alten `Make-*.ps1` bleiben, bis MARS umgestellt ist; sie rufen noch
+`Publish-NET` und `Build-Projects` auf und laufen mit MdsTools nicht mehr.
 
-**TODO:** Ergebnis der Umstellung je Skript.
+Stand 05.11.2026: Die Umstellung entfällt vorerst. Auf MARS gibt es keinen TaskScheduler, die REST-Dienste laufen
+direkt in der Auftragsabwicklung.
 
 ### Einrichten und Testen auf MARS
 
-- [ ] `Install.ps1` ausführen, neue Shell: `Show-Mds` zeigt `woy 26`, Repos `C:\woyCode`, Root `D:\Root`.
-- [ ] `%USERPROFILE%\.woy\woy.env` vorhanden und vollständig (`Get-WoyEnvPath`, `Get-WoyValue …`).
-- [ ] `Get-WoyCredential server` liefert eine Anmeldung.
-- [ ] `go`, `mk`, `run` in `C:\woyCode` (flache Struktur) prüfen.
-- [x] Bauen mit `mk auf` (Programmtabelle, `-List` geprüft); vollständiger Lauf mit Init/Post noch zu testen.
-- [ ] Kopieren lokal mit `run auf copy`.
-- [ ] Kopieren nach TEST-SRV mit `run auf copy t`.
-- [ ] Kopieren nach SQL-SRV mit `run auf copy s`.
-- [ ] Deploy-Skripte in `Net/scripts/Windows` mit MdsTools.
-- [ ] **TODO:** weitere Besonderheiten.
+Siehe [Mars.md](Mars.md#4-einrichten-und-testen).
 
 ## Offene Punkte
 
-- Repo `MdsTools` auf GitHub ist noch leer: Erster Push von `Repos/Mds` steht aus (`git push -u origin main`).
-- Die Kurzbefehle `2Net`, `2Maui` … und der Alias `zip` des alten Profils entfallen (`go` bzw. `Save-Develop`).
-- Präfix für neue Cmdlets festlegen (z. B. `Mds`) – betrifft nur neue Funktionen, nicht die übernommenen.
-- Logging: Format und Aufbewahrungsdauer der Dateien in `$mdsLogs`.
-- `.env.example` (Vorlage für die woy.env) fehlt im Repo; `Install.ps1` erwartet sie.
-
+Offene Aufgaben stehen in zwei Listen: [Luna.md](Luna.md) (allgemein und LUNA, zuerst) und [Mars.md](Mars.md)
+(Umstellung von MARS in einem Stück, danach).
