@@ -39,6 +39,7 @@
 | 2026-11-05 | 0.33    | Hubert Bieder/Claude | 8.3: Repos/Root unabhängig (`~/Repos`, `~/Root`, `D:\Root`); ohne `$mdsDev`, `go dev` |
 | 2026-11-05 | 0.34    | Hubert Bieder/Claude | 8.3.1: Offene Punkte in MDS-Development.md (C# auf 8.3, mdsPackage erledigt)            |
 | 2026-11-05 | 0.35    | Hubert Bieder/Claude | MdsTools-Migration.md entfernt (abgeschlossen); Umbenennungen hierher; offene Punkte in Luna.md/Mars.md |
+| 2026-11-05 | 0.36    | Hubert Bieder/Claude | 8.3.2: Nur aktueller Stand: mdsPackage, Umbenennungen, Herkunftsangaben und Erledigtes entfernt |
 
 ---
 
@@ -66,10 +67,9 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 
 | Begriff       | Bedeutung                                                                  |
 | ------------- | -------------------------------------------------------------------------- |
-| mdsPackage    | Bisheriges PowerShell-Modul unter `~/Repos/mdsPackage` (Version 7.0)       |
-| MdsTools      | Neues Modul, Nachfolger von mdsPackage, Repo-Ordner `~/Repos/Mds`          |
+| MdsTools      | Dieses Modul, nur auf LUNA und MARS installiert, Repo-Ordner `~/Repos/Mds` |
 | woy           | Altes Auftragsprogramm samt Infrastruktur – wird nicht weiterentwickelt    |
-| Auftrag (MDS) | Auftragsabwicklung auf Basis von woy/mdsProfile – **nur unter Windows**    |
+| Auftrag (MDS) | Auftragsabwicklung (Repo `Auf`) – **nur unter Windows**                    |
 | Kurzname      | Ordnername eines Repos unter `Repos/` (z. B. `Net`, `Maui`), Ziel für `go` |
 
 ## Anforderungen
@@ -79,9 +79,9 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 | A1  | Nur PowerShell 7, mindestens **7.6** (`PowerShellVersion = '7.6'` im Manifest, `#Requires -Version 7.6`).                                                   |
 | A2  | Die Modulversion wird **zentral** im Manifest `MdsTools.psd1` festgelegt; `$mdsVersion` liest sie aus.                                                      |
 | A3  | `Install.ps1` in der Repo-Root installiert das Modul, das Profil und die globalen Skripte.                                                                  |
-| A4  | `Uninstall.ps1` in der Repo-Root entfernt alte Installationen von mdsPackage und MdsTools.                                                                  |
-| A5  | Übernommene Cmdlets behalten ihren Namen, außer den Einträgen unter [Umbenennungen](#umbenennungen).                                                         |
-| A6  | Funktionen für woy und Auftragsabwicklung kommen als einzelne `*.ps1` nach `MdsSkripte`. Das JSON-Verfahren (`*.mds`) entfällt (8.2).        |
+| A4  | `Uninstall.ps1` in der Repo-Root entfernt die Installation von MdsTools aus allen Benutzer-Modulpfaden.                                                     |
+| A5  | Cmdlet-Namen folgen dem Verb-Substantiv-Schema, Substantive im Singular (`Build-Project`, `Get-ZipEntry`).                                                  |
+| A6  | Funktionen für woy und Auftragsabwicklung kommen als einzelne `*.ps1` nach `MdsSkripte`.                                                    |
 | A7  | Alle übrigen Funktionen kommen thematisch gruppiert in `*.ps1`-Dateien unter `SkriptModule`; `MdsTools.psm1` lädt sie per Dot-Sourcing in den Modulbereich. |
 | A8  | Nur Funktionen, die von außen gebraucht werden, werden exportiert; alles andere bleibt intern.                                                              |
 | A9  | Jede öffentliche Funktion hat eine Comment-based Help (`.SYNOPSIS`, `.EXAMPLE`).                                                                            |
@@ -94,8 +94,7 @@ Modul in `Modul/MdsTools/`.
 
 Die Funktionsdateien in `SkriptModule` sind `*.ps1` und keine eigenen `*.psm1`-Module. Das Root-Modul lädt sie per
 Dot-Sourcing in **einen** gemeinsamen Modulbereich. So sehen sich alle Funktionen gegenseitig, und interne Helfer
-wie `Resolve-MdsPath` müssen nicht exportiert werden. mdsPackage musste sie wegen der getrennten `NestedModules`
-global machen.
+wie `Resolve-MdsPath` müssen nicht exportiert werden.
 
 ```text
 ~/Repos/Mds/
@@ -103,8 +102,8 @@ global machen.
    MDS-Development.md          # Systematik der Entwicklungsumgebung
    MdsTools.md                 # diese Beschreibung
    Luna.md / Mars.md           # offene Aufgaben: erst Luna, dann Mars
-   Install.ps1                 # Installation (analog mdsPackage)
-   Uninstall.ps1               # entfernt alte Installationen (bisher "clear.ps1")
+   Install.ps1                 # Installation von Modul, Profil und globalen Skripten
+   Uninstall.ps1               # entfernt die Installation
    InstallHelper.ps1           # gemeinsame Pfad-Helfer für Install.ps1 und Uninstall.ps1
    Update-PowerShell7.ps1      # nur Windows, läuft unter 5.1: PowerShell 7 prüfen/installieren (-Last, -Version)
    Update-PowerShell7.cmd      # Starter: 5.1 als Administrator, Argumente werden durchgereicht
@@ -123,7 +122,7 @@ global machen.
             Zip.ps1            # ZIP-Funktionen
             Tools.ps1          # Update-/Show-PowerShell, Update-DotNet, Show-Mds
             Navigation.ps1     # go, mk, run
-         MdsSkripte/           # *.ps1 – woy/Auftrag (aus mdsProfile.ps1), nur Windows
+         MdsSkripte/           # *.ps1 – woy/Auftrag, nur Windows
             InitMDS.ps1        # lädt alle MdsSkripte
             WoyEnv.ps1         # Get-WoyValue, Get-WoyCredential (woy.env)
       Skripte/                 # globale Skripte (CloneAll, PushAll, …) → $mdsRepos
@@ -181,9 +180,7 @@ Die Hilfsfunktionen dazu (`Clear-WoyProcess`, `Write-WoyVersionCS`, `Write-Datei
 - Jeder Ordner lässt sich mit `DEV_<NAME>` umlenken (`DEV_REPOS` → `$mdsRepos`,
   `DEV_ROOT` → `$mdsRoot`, `DEV_BIN` … `DEV_TEMP`); Regel siehe
   [MDS-Development.md](MDS-Development.md#umlenken-per-umgebungsvariable).
-- Die C#-Klasse `xBase.BaseRoot` in NetCoreLib2026 verwendet dieselbe Logik (Anpassung an 8.3 offen, siehe
-  [MDS-Development.md](MDS-Development.md#offene-punkte)).
-- Bis 8.2 gab es zusätzlich `$mdsDev` (`~/Dev`, `DEV_HOME`, `go dev`); ab 8.3 entfällt der gemeinsame Elternordner.
+- Die C#-Klasse `xBase.BaseRoot` in NetCoreLib2026 verwendet dieselbe Logik.
 
 ## Befehle
 
@@ -275,8 +272,8 @@ $Programme = [ordered]@{
 }
 ```
 
-Schlüssel je Programm: `Project` (Pflicht; der frühere Name `Projekt` wird weiter verstanden), `Group`, `OutDir`,
-`Nur` (`'Windows'`/`'MacOS'`), `Keep` (ab 8.2: Unterordner, die `Clear-BinFolder` nach dem Bauen zusätzlich
+Schlüssel je Programm: `Project` (Pflicht), `Group`, `OutDir`,
+`Nur` (`'Windows'`/`'MacOS'`), `Keep` (Unterordner, die `Clear-BinFolder` nach dem Bauen zusätzlich
 behält, z. B. `@('Template', 'Bilder', 'Log')` in einem gemeinsamen Bin-Ordner).
 
 Baut ein Repo in einen eigenen Bin-Ordner (z. B. `C:\woyCode\Auf\Bin\Net10` statt `$mdsBin`), trägt `Make.ps1`
@@ -440,75 +437,42 @@ mk             Baut Programme eines Repos über $mdsRepos/<Repo>/scripts/…   N
 
 ## Cmdlets und Funktionen
 
-Grundlage ist die Exportliste von mdsPackage, ausgewertet mit einer Suche nach Aufrufen in den Repos
-`Net`, `Maui`, `PHB`, in den globalen Skripten und in `mdsProfile.ps1`.
+Funktionen des Moduls, nach Datei.
 
-Die Tabelle verwendet bereits die neuen Namen (siehe [Umbenennungen](#umbenennungen)).
+| Funktion                                                         | Datei            | Export | Hinweis                                                                                |
+| ---------------------------------------------------------------- | ---------------- | ------ | -------------------------------------------------------------------------------------- |
+| `Write-Header`, `Write-Info`                                     | `Output.ps1`     | ja     | in Make-Skripten verwendet                                                             |
+| `Write-Start`, `Write-Success`, `Write-Fail`                     | `Output.ps1`     | ja     | einheitliche Ausgabe für `Make.ps1`                                                    |
+| `Publish-DotNet`, `Build-Project`, `Invoke-Make`                 | `Build.ps1`      | ja     | in Make-Skripten verwendet; Invoke-Make für scripts/Make.ps1                           |
+| `Clear-BinFolder`                                                | `Build.ps1`      | ja     | in Make-Skripten verwendet                                                             |
+| `Get-TargetFramework`, `Find-CsProj`                             | `Build.ps1`      | nein   | nur intern genutzt                                                                     |
+| `Update-DotNet`, `Update-PowerShell`, `Show-PowerShell`          | `Tools.ps1`      | ja     | interaktiv genutzt                                                                     |
+| `Show-Mds`                                                       | `Tools.ps1`      | ja     | Anzeige der mds-Variablen                                                              |
+| `go`, `mk`, `run`, `Show-Repos`                                  | `Navigation.ps1` | ja     | Befehle für die tägliche Arbeit                                                        |
+| `Clear-CodeFolder`, `Clear-Target`, `Remove-Folder`              | `FileIO.ps1`     | ja     | interaktiv genutzt                                                                     |
+| `Copy-FileWithCredential`, `Copy-FolderWithCredential`           | `Share.ps1`      | ja     | Windows und macOS, siehe unten                                                         |
+| `Copy-Folder`, `Remove-OldFile`, `Get-DevelopFiles`              | `FileIO.ps1`     | nein   | nur intern genutzt                                                                     |
+| `Copy-ToZip`, `Copy-FileToZip`, `Export-FromZip`, `Get-ZipEntry` | `Zip.ps1`        | ja     | allgemeine Hilfsfunktionen                                                             |
+| `Resolve-MdsPath`                                                | `Common.ps1`     | nein   | interner Pfad-Helfer                                                                   |
+| `Get-ProjectReference`, `Get-ExportedMember`                     | `Common.ps1`     | nein   | nur intern genutzt                                                                     |
+| `Backup-Develop`, `Get-OneDriveRoot`                             | `FileIO.ps1`     | ja     | OneDrive unter Windows und macOS (`~/Library/CloudStorage`)                            |
 
-| Funktion                                                         | Bisher in | Ziel             | Export | Begründung                                                                             |
-| ---------------------------------------------------------------- | --------- | ---------------- | ------ | -------------------------------------------------------------------------------------- |
-| `Write-Header`, `Write-Info`                                     | Base      | `Output.ps1`     | ja     | in Make-Skripten verwendet                                                             |
-| `Write-Start`, `Write-Success`, `Write-Fail`                     | Base      | `Output.ps1`     | ja     | einheitliche Ausgabe für `Make.ps1`                                                    |
-| `Publish-DotNet`, `Build-Project`, `Invoke-Make`                 | DevNet    | `Build.ps1`      | ja     | in Make-Skripten verwendet; Invoke-Make für scripts/Make.ps1                           |
-| `Clear-BinFolder`                                                | FileIO    | `Build.ps1`      | ja     | in Make-Skripten verwendet                                                             |
-| `Get-TargetFramework`, `Find-CsProj`                             | DevNet    | `Build.ps1`      | nein   | nur intern genutzt                                                                     |
-| `Update-DotNet`, `Update-PowerShell`, `Show-PowerShell`          | Tools     | `Tools.ps1`      | ja     | interaktiv genutzt                                                                     |
-| `Show-Mds`                                                       | neu       | `Tools.ps1`      | ja     | Anzeige der mds-Variablen                                                              |
-| `go`, `mk`, `run`, `Show-Repos`                                  | neu       | `Navigation.ps1` | ja     | Befehle für die tägliche Arbeit                                                        |
-| `Clear-CodeFolder`, `Clear-Target`, `Remove-Folder`              | FileIO    | `FileIO.ps1`     | ja     | interaktiv genutzt                                                                     |
-| `Copy-FileWithCredential`, `Copy-FolderWithCredential`           | Common    | `Share.ps1`      | ja     | auch auf dem Mac nötig, siehe unten                                                    |
-| `Copy-Folder`, `Remove-OldFile`, `Get-DevelopFiles`              | FileIO    | `FileIO.ps1`     | nein   | kein externer Aufruf gefunden                                                          |
-| `Copy-ToZip`, `Copy-FileToZip`, `Export-FromZip`, `Get-ZipEntry` | Zip       | `Zip.ps1`        | ja     | allgemeine Hilfsfunktionen                                                             |
-| `Resolve-MdsPath`                                                | Common    | `Common.ps1`     | nein   | wird durch die globalen Variablen ersetzt                                              |
-| `Get-ProjectReference`, `Get-ExportedMember`                     | Common    | `Common.ps1`     | nein   | kein externer Aufruf gefunden                                                          |
-| `Test-Package`                                                   | Common    | **entfällt**     | –      | gehört zum JSON-Verfahren, wird ab 8.2 nicht mehr unterstützt (E8)                     |
-| `Write-Error`                                                    | –         | **entfällt**     | –      | eingebautes Cmdlet, darf nicht überschrieben werden                                    |
-| `Backup-Develop`, `Get-OneDriveRoot`                             | FileIO    | `FileIO.ps1`     | ja     | waren als `global:` definiert; macOS ergänzt (OneDrive unter `~/Library/CloudStorage`) |
-
-### Umbenennungen
-
-Diese Cmdlets und Funktionen erhalten in MdsTools einen neuen Namen. Aliase für die alten Namen gibt es nicht,
-da mdsPackage und MdsTools nie gleichzeitig geladen werden.
-
-| Alter Name        | Neuer Name        | Grund                                                         |
-| ----------------- | ----------------- | ------------------------------------------------------------- |
-| `Build-Projects`  | `Build-Project`   | PowerShell empfiehlt Substantive im Singular                  |
-| `Limit-Files`     | `Remove-OldFile`  | Zweck erkennbar: behält die neuesten n Dateien, löscht ältere |
-| `Get-ZipEntries`  | `Get-ZipEntry`    | Singular                                                      |
-| `Show-Powershell` | `Show-PowerShell` | Schreibweise                                                  |
-| `Find-csProj`     | `Find-CsProj`     | Schreibweise                                                  |
-| `Publish-NET`     | `Publish-DotNet`  | Schreibweise, einheitlich zu `Update-DotNet`                  |
-| `GetLogDir`       | `Get-LogDir`      | Verb-Substantiv-Schema (intern)                               |
-| `IsInPattern`     | `Test-InPattern`  | Verb-Substantiv-Schema (intern)                               |
-| `IsMauiExe`       | `Test-MauiExe`    | Verb-Substantiv-Schema (intern)                               |
-
-### Nicht übernommene Funktionen von mdsPackage
-
-- **Git** (`GitUtil.psm1`: `Invoke-Commit`, `Invoke-Push`, `Show-Git*`, `Get-GitRepos` …): entfällt, `git` direkt verwenden.
-- **JSON-Verfahren** (`New-Package`, `Read-PackageDefinition`, `Invoke-PackageBuild`, `Get-PackageTargetDirs`,
-  `Show-MdsPackage`, `Get-MDS`, `Test-Package`): entfällt ab 8.2 ganz, `*.mds`-Dateien werden nicht mehr unterstützt.
-- **woy** (`Enable-WoyTls`, `Get-UncShareRoot`): wandert nach `MdsSkripte`.
-- **Intern** (`Test-IsAdmin`, `Assert-Admin`, `Start-Spinner`, `Initialize-LogFile` …): werden mit übernommen,
-  aber nicht exportiert.
 ### Copy-FileWithCredential / Copy-FolderWithCredential
 
-Beide Funktionen sind heute nur unter Windows lauffähig. Für den Einsatz auf dem Mac sind drei Änderungen nötig:
+Kopieren eine Datei bzw. einen Ordner auf eine SMB-Freigabe, unter Windows und macOS:
 
-| Heute                                               | Neu                                                                                       |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Standard-Credential aus `Get-WoyCredential` (woy)   | `-Credential` ohne woy-Vorgabe; fehlt er, wird mit `Get-Credential` nachgefragt           |
-| Verbindung zur Freigabe mit `net use` (nur Windows) | Windows: `net use`; macOS: `mount_smbfs` in einen temporären Ordner unter `$mdsRoot/Temp` |
-| Freigabe nur als UNC-Pfad `\\server\share`          | zusätzlich `smb://server/share` (macOS-Schreibweise); beide werden intern umgerechnet     |
+| Punkt      | Verhalten                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| Anmeldung  | `-Credential`; fehlt er, wird mit `Get-Credential` nachgefragt                             |
+| Verbindung | Windows: `net use`; macOS: `mount_smbfs` in einen temporären Ordner unter `$mdsTemp`       |
+| Ziel       | `\\server\share\…`, `//server/share/…` oder `smb://server/share/…`                          |
 
-Die Verbindung wird nach dem Kopieren immer wieder getrennt, auch im Fehlerfall (`finally`).
-Unter Windows kann `MdsSkripte` weiterhin die woy-Anmeldedaten übergeben.
+Die Verbindung wird nach dem Kopieren immer getrennt, auch im Fehlerfall (`finally`). Unter Windows übergibt
+`MdsSkripte` die woy-Anmeldedaten.
 
 ## Auftragsabwicklung (nur Windows)
 
-> **Stand:** Auf MARS eingerichtet: Bauen mit `mk auf`, Kopieren mit `run auf copy`. Stellen mit **TODO** sind
-> noch offen.
-
-Die Auftragsabwicklung (früher woy/mdsProfile) läuft nur unter Windows. Unter macOS wird nichts davon
+Die Auftragsabwicklung wird auf MARS mit MdsTools gebaut (`mk auf`) und verteilt (`run auf copy`). Sie läuft nur unter Windows. Unter macOS wird nichts davon
 geladen; `$mdsWoy` ist dort `0`. Entwicklungsroot ist `C:\woyCode`, Laufzeit-Root `D:\woySystems`.
 
 ### Voraussetzungen
@@ -524,8 +488,7 @@ geladen; `$mdsWoy` ist dort `0`. Entwicklungsroot ist `C:\woyCode`, Laufzeit-Roo
 
 ### Bauen: mk auf
 
-`Auf/scripts/Make.ps1` enthält die Programmtabelle (früher `auftrag.mds`). Jeder Part der `.mds` ist eine Gruppe;
-die Programme landen absolut in `$mdsWoyBin` (`C:\woyCode\Auf\Bin\<Ordner>`), nicht in `$mdsBin`.
+`Auf/scripts/Make.ps1` enthält die Programmtabelle mit den Gruppen unten; die Programme landen absolut in `$mdsWoyBin` (`C:\woyCode\Auf\Bin\<Ordner>`), nicht in `$mdsBin`.
 
 | Gruppe        | Programme                                             | Ausgabe ($mdsWoyBin\…)   |
 | ------------- | ----------------------------------------------------- | ------------------------ |
@@ -539,7 +502,7 @@ die Programme landen absolut in `$mdsWoyBin` (`C:\woyCode\Auf\Bin\<Ordner>`), ni
 
 `Keep` schützt die Unterordner `Template`, `Bilder`, `Log` und `Skripte` vor `Clear-BinFolder`.
 
-`Init.ps1` und `Post.ps1` (früher `Auftrag_Pre.ps1`/`Auftrag_Post.ps1`) arbeiten **nur bei `mk auf` ohne
+`Init.ps1` und `Post.ps1` arbeiten **nur bei `mk auf` ohne
 Auswahl**; bei `mk auf +r` oder einem einzelnen Programm geschieht dort nichts.
 
 | Skript     | Inhalt                                                                                                 |
@@ -605,7 +568,7 @@ Rechner- und serverbezogene Abläufe liegen als `scripts/_<Name>.ps1` im jeweili
 
 #### run auf copy – Installationsverzeichnis verteilen
 
-`Auf/scripts/_copy.ps1` (aus `Publish-Auf2000` in mdsProfile.ps1) kopiert das Deck
+`Auf/scripts/_copy.ps1` kopiert das Deck
 `$mdsWoyBin\UpdateService` (entsteht bei `mk auf`) inkrementell in das `InstallDir` des Ziels. Der erste
 Buchstabe des Ziels reicht.
 
@@ -618,17 +581,15 @@ Buchstabe des Ziels reicht.
 Für Freigaben meldet sich das Skript mit `Get-WoyCredential 'server'` an. Es definiert die globalen Funktionen
 `Publish-Auf2000 [<Ziel>]` und `Get-WoyServerShare <Ziel>`, die danach in der Sitzung aufrufbar bleiben.
 
-**TODO:** Kopieren vom Entwicklungsrechner nach TERRA (früher als `_Copy2Terra.ps1` vorgesehen).
-
 #### run auf auto, version, desktop
 
-| Aufruf                       | Skript         | Inhalt (früher in mdsProfile.ps1 / Make-MDS.ps1)                                        |
+| Aufruf                       | Skript         | Inhalt                                                                                  |
 | ---------------------------- | -------------- | --------------------------------------------------------------------------------------- |
 | `run auf auto`               | `_auto.ps1`    | `Make.ps1` (= `mk auf`), bei Erfolg `_copy.ps1` lokal, dann woyControlCenter als Admin  |
-|                              |                | (`KEEPPID=<PID> OhneDBF`, mit `-MitDatenbank` `Installieren`) – ersetzt Make-MDS.ps1     |
+|                              |                | (`KEEPPID=<PID> OhneDBF`, mit `-MitDatenbank` `Installieren`)                           |
 | `run auf version`            | `_version.ps1` | Version aus `Dateiliste.txt`: Deck, lokal (InstallDir, Config), SQL-SRV, TEST-SRV        |
 | `run auf desktop`            | `_desktop.ps1` | alle Desktop-Verknüpfungen: D@, D0–D5 auf die run-Skripte, C, M, T, S, R auf die         |
-|                              |                | Programme in `$mdsWoyBin` (früher Install-DevLink/Install-ProgLink)                     |
+|                              |                | Programme in `$mdsWoyBin`                                                               |
 
 `Get-WoyServerShare <t|s>` (UNC-Wurzel `\\<Server>\woyAufInstall`) steht in `MdsSkripte/Auftrag.ps1`.
 
@@ -637,23 +598,14 @@ Für Freigaben meldet sich das Skript mit `Get-WoyCredential 'server'` an. Es de
 `Auf/scripts/_backup.ps1` ruft `Backup-Develop -Force -Verbose` für `$mdsWoySrc` auf: ein vorhandenes
 Tagesarchiv `Auf_yyyyMMdd.zip` wird überschrieben, am Ende stehen Pfad und Größe der Ziel-ZIP.
 
-`Backup-Develop` liefert ab 8.2 den **Pfad der Ziel-ZIP** (bisher `$true`/`$false`), bei Fehler `$null`. Ohne
+`Backup-Develop` liefert den **Pfad der Ziel-ZIP**, bei Fehler `$null`. Ohne
 `-Force` und mit vorhandenem Tagesarchiv bleibt das Archiv unverändert, zurück kommt sein Pfad.
 
 ### Deploy-Skripte
 
-Die Deploy-Skripte in `Net/scripts/Windows` (`Make-TaskAPI`, `Make-RestSRV`, `Make-AufAPI`, `Make-My*`,
-`Make-TaskScheduler`, `Make-Rebuild`) stoppen/starten Dienste und IIS und werden aus Programmen aufgerufen
-(`TaskAdminConfig.RebuildScript`, `GlobalConfig.cs`). Sie gehen nicht in `Make.ps1` auf, sondern werden auf
-MdsTools und die neuen Pfade umgestellt. Die alten `Make-*.ps1` bleiben, bis MARS umgestellt ist; sie rufen noch
-`Publish-NET` und `Build-Projects` auf und laufen mit MdsTools nicht mehr.
-
-Stand 05.11.2026: Die Umstellung entfällt vorerst. Auf MARS gibt es keinen TaskScheduler, die REST-Dienste laufen
-direkt in der Auftragsabwicklung.
-
-### Einrichten und Testen auf MARS
-
-Siehe [Mars.md](Mars.md#4-einrichten-und-testen).
+`Net/scripts/Windows/Make-TaskAPI.ps1`, `Make-RestSRV.ps1` und `Maui/Make-Rebuild.ps1` sind nicht auf MdsTools
+umgestellt (alte Bin-Pfade, `Publish-NET`/`Build-Projects`) und werden nicht gebraucht: Auf MARS gibt es keinen
+TaskScheduler, die REST-Dienste laufen direkt in der Auftragsabwicklung.
 
 ## Offene Punkte
 

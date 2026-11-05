@@ -9,7 +9,6 @@
       2. Profile/profile.ps1 -> $PROFILE.CurrentUserAllHosts (vorher Sicherung *.bak)
       3. Modul/Skripte/*.ps1 -> $mdsRepos (nur wenn neuer); veraltete Skripte werden entfernt
       4. nur Windows: ~/.woy/woy.env einrichten (woy-Anmeldedaten)
-    Ist mdsPackage noch installiert, bricht das Skript ab: erst Uninstall.ps1 ausfuehren.
 
 .EXAMPLE
     ./Install.ps1
@@ -20,6 +19,7 @@
     6.0.0    2026-10-31  Hubi/Claude   Umstellung auf MdsTools (MdsTools.md, Schritt 5)
     6.1.0    2026-11-04  Hubi/Claude   Globale Skripte aus Modul/Skripte; Kopf-/Schlusszeile mit Modulversion
     6.2.0    2026-11-05  Hubi/Claude   Globale Skripte nach $mdsRepos ($mdsDev entfaellt, 8.3)
+    6.3.0    2026-11-05  Hubi/Claude   Pruefung auf mdsPackage entfernt
 #>
 [CmdletBinding()]
 param()
@@ -35,17 +35,6 @@ $script:ObsoleteScripts = @('UpdatePS.ps1')
 
 # Gemeinsame Pfad-Helfer: Get-UserHome, Get-ProfileRoot, Get-CurrentUserModuleDir
 . (Join-Path $PSScriptRoot 'InstallHelper.ps1')
-
-# Bricht ab, wenn mdsPackage noch installiert ist: gleiche Cmdlet-Namen, darf nie parallel geladen werden.
-function Assert-NoMdsPackage() {
-    $alt = Get-Module -ListAvailable -Name mdsPackage
-    if ($alt) {
-        Write-Host -ForegroundColor Red "mdsPackage ist noch installiert: $($alt.ModuleBase -join ', ')"
-        Write-Host -ForegroundColor Red "Bitte zuerst Uninstall.ps1 ausfuehren."
-        return $false
-    }
-    return $true
-}
 
 function Install-MdsModule() {
     $sourceDir = Join-Path $script:RepoRoot 'Modul/MdsTools'
@@ -152,9 +141,6 @@ function Install-WoyEnv() {
 }
 
 Write-Host "================= MdsTools installieren ==========================  V$ModulVersion  ====="
-if (-not (Assert-NoMdsPackage)) {
-    return
-}
 if (-not (Install-MdsModule)) {
     Write-Host -ForegroundColor Red "Installation abgebrochen."
     return

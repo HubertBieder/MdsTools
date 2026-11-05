@@ -11,12 +11,13 @@
 #   2026-11-04  Hubi/Claude  8.2.3: Update-PowerShell unter Windows nur Anzeige (Update-PowerShell7.cmd)
 #   2026-11-05  Hubi/Claude  8.3.0: Repos und Root unabhaengig; $mdsDev, DEV_HOME und go dev entfallen
 #   2026-11-05  Hubi/Claude  8.3.1: Offene Punkte MDS-Development (C# auf 8.3, mdsPackage), Umzugsrezept LUNA
+#   2026-11-05  Hubi/Claude  8.3.2: Prompt ~, .env.example, Install/Uninstall ohne mdsPackage; Doku nur aktueller Stand
 #
 @{
     RootModule        = 'MdsTools.psm1'
 
     # Einzige Stelle fuer die Modulversion (A2); $mdsVersion liest sie aus.
-    ModuleVersion     = '8.3.1'
+    ModuleVersion     = '8.3.2'
 
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'

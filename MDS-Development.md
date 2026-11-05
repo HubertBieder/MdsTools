@@ -14,6 +14,7 @@
 | 2026-11-05 | 1.3     | Hubert Bieder/Claude | Repos und Root unabhängig (`~/Repos`, `~/Root`; `C:\woyCode`, `D:\Root`); Dev entfällt (MdsTools 8.3); Umstellungsrezept |
 | 2026-11-05 | 1.4     | Hubert Bieder/Claude | Offene Punkte: C# auf 8.3 und mdsPackage erledigt, `Auf` präzisiert; Rezept LUNA mit Befehlen (MdsTools 8.3.1) |
 | 2026-11-05 | 1.5     | Hubert Bieder/Claude | Erledigtes LUNA-Rezept entfernt; MdsTools-Migration.md entfällt; offene Punkte und Rezept MARS in Luna.md/Mars.md |
+| 2026-11-05 | 1.6     | Hubert Bieder/Claude | Nur aktueller Stand: Erledigt-Liste, Dev-Hinweise und mdsPackage entfernt |
 
 ## Inhalt und Abgrenzung
 
@@ -28,7 +29,7 @@ steht in [MdsTools.md](MdsTools.md), dort auch die Auftragsabwicklung unter Wind
 
 - Einheitliche, schlanke Entwicklungsumgebung auf **LUNA** (macOS) und **MARS** (Windows).
 - Schwerpunkt: C#-Entwicklung (WinForms, WPF, .NET MAUI, Services), zusätzlich Python.
-- **Konventionen statt Konfiguration**: Die JSON-getriebene Modellierung von mdsPackage ist abgelöst.
+- **Konventionen statt Konfiguration.**
 - Das alte Auftragsprogramm **woy** wird nicht weiterentwickelt. Unter Windows bleibt sein Ordner `C:\woyCode`
   aber die Basis der Umgebung (siehe [Windows](#windows-mars)).
 
@@ -58,8 +59,6 @@ Es gibt genau zwei Bereiche. Sie sind **unabhängig voneinander** und haben kein
 | Root    | Laufzeitumgebung `Bin`, `Config`, `Data`, `Logs`, `Temp` – nie in Git                              | `$mdsRoot`  |
 
 Wo die Bereiche auf der Platte liegen, unterscheidet sich zwischen macOS und Windows; das Modell ist gleich.
-
-> Bis MdsTools 8.2 gab es zusätzlich den Elternordner Dev (`$mdsDev`, `~/Dev`, `DEV_HOME`). Er entfällt ab 8.3.
 
 ### macOS (LUNA)
 
@@ -140,8 +139,6 @@ Regel: **`DEV_<NAME>` zeigt genau auf den Ordner `<Name>`** – `DEV_REPOS`, `DE
 `DEV_CONFIG`, `DEV_DATA`, `DEV_LOGS`, `DEV_TEMP`. Untergeordnete Ordner folgen mit, sofern sie nicht selbst gesetzt
 sind (`DEV_ROOT` verschiebt auch `Bin`, `Config` …). Die Regel gilt auf beiden Systemen; ohne Umgebungsvariable
 gilt der Standard aus der Tabelle oben.
-
-> Bis 01.11.2026 stand `DEV_ROOT` für `~/Dev`, danach `DEV_HOME`. Ab MdsTools 8.3 gibt es `DEV_HOME` nicht mehr.
 
 ## Repositories
 
@@ -269,17 +266,3 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
 
 Offene Aufgaben stehen in zwei Listen: [Luna.md](Luna.md) (allgemein und LUNA, zuerst) und [Mars.md](Mars.md)
 (Umstellung von MARS in einem Stück, danach).
-
-Erledigt:
-
-- 05.11.2026: C# an MdsTools 8.3 angepasst (NetCoreLib2026 `68659b52`, NetMauiApps `8c04d99`). `xBase.BasePfad`/
-  `BaseRoot` setzen Repos und Root unabhängig (`DEV_REPOS` bzw. `~/Repos`, `C:\woyCode`; `DEV_ROOT` bzw. `~/Root`,
-  `D:\Root`/`C:\Root`), `Dev`, `DEV_HOME` und der Konstruktor mit Dev-Pfad entfallen (neu: `repos`, `root`,
-  `config`). Ebenso `FritzConfig`, `ImageToolsConfig`, `GlobalConfig` (RepoRoot, MachineDefault),
-  `ServiceInstaller` (plist setzt `DEV_ROOT=~/Root`), TaskScheduler und TaskAdmin (prüfen `Root` statt `Dev`).
-- 05.11.2026: mdsPackage ist auf LUNA und MARS nicht mehr installiert, `Repos/mdsPackage` gibt es nicht mehr.
-  Reste auf MARS unter `C:\woyCode\_Alt\mdsPackage`;
-  das GitHub-Repo bleibt für die Kundenrechner (siehe oben) erhalten.
-- 05.11.2026: LUNA umgezogen (`~/Repos`, `~/Root`): Dienst gestoppt, Config-Pfade korrigiert (Sicherungen
-  `*.bak-83`), MdsTools 8.3.1 installiert, TaskScheduler/Tasks, RestServices und TaskAdmin neu gebaut, Dienst mit
-  `DEV_ROOT=~/Root` neu installiert; `~/Dev` entfernt.

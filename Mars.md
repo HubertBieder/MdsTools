@@ -1,13 +1,8 @@
 # Mars – Umstellung in einem Stück
 
-Erst beginnen, wenn [Luna.md](Luna.md) **komplett** erledigt ist. Die Liste wird in einem Durchgang abgearbeitet.
-Dafür braucht es Admin-Rechte. Auf MARS gibt es keinen TaskScheduler; die REST-Dienste laufen direkt in der
-Auftragsabwicklung und stehen für die Abschnitte 1–2 still.
-
-| Datum      | Autor                | Änderung                                                          |
-| ---------- | -------------------- | ----------------------------------------------------------------- |
-| 2026-11-05 | Hubert Bieder/Claude | Erste Fassung                                                     |
-| 2026-11-05 | Hubert Bieder/Claude | Ohne TaskScheduler und Deploy-Skripte; REST in Auftragsabwicklung |
+Erst beginnen, wenn [Luna.md](Luna.md) leer ist. Die Liste wird in einem Durchgang abgearbeitet; erledigte Punkte
+werden gelöscht. Es braucht Admin-Rechte. Auf MARS gibt es keinen TaskScheduler; die REST-Dienste laufen direkt in
+der Auftragsabwicklung und stehen für die Abschnitte 1–2 still.
 
 ## 0. Vorher prüfen
 
@@ -25,7 +20,7 @@ Root muss verschoben sein, **bevor** MdsTools 8.3 geladen wird, sonst legt das M
   Get-Process | Where-Object Path -like 'D:\Dev\Root\*'    # muss leer sein
   ```
 
-- [ ] Verschieben und alte Umgebungsvariablen prüfen:
+- [ ] Verschieben und Umgebungsvariablen prüfen:
 
   ```powershell
   Move-Item D:\Dev\Root D:\Root
@@ -43,7 +38,7 @@ Root muss verschoben sein, **bevor** MdsTools 8.3 geladen wird, sonst legt das M
   ```
 
 - [ ] `Show-Mds` zeigt `woy 26`, Repos `C:\woyCode`, Root `D:\Root` (Quelle `Standard`, `Vorhanden = True`).
-- [ ] Config auf alte Pfade prüfen und korrigieren (Sicherung `*.bak-83`):
+- [ ] Config auf `D:\Dev\` prüfen und korrigieren (Sicherung `*.bak-83`):
 
   ```powershell
   $alt = Get-ChildItem D:\Root\Config -Recurse -File -Exclude *.bak* | Select-String -List -SimpleMatch 'D:\Dev\'
@@ -58,43 +53,28 @@ Root muss verschoben sein, **bevor** MdsTools 8.3 geladen wird, sonst legt das M
   zusätzlich `-replace [regex]::Escape('D:\\Dev\\Root'), 'D:\\Root'` anwenden.
 - [ ] Aufgabenplanung prüfen: `Get-ScheduledTask | Where-Object { $_.Actions.Execute -like '*\Dev\*' }`.
 
-## 3. Neu bauen und Einrichten
+## 3. Bauen, starten, testen
 
-- [ ] Net, Maui und Auf aktualisieren und bauen:
+- [ ] Net und Maui aktualisieren und bauen (Ziel `$mdsBin` = `D:\Root\Bin`):
 
   ```powershell
   go net;  git pull; mk net
   go maui; git pull; mk maui
-  go auf;  git pull; mk auf          # vollständiger Lauf mit Init/Post
   ```
 
-- [ ] Auftragsabwicklung samt REST starten, neue Logdateien unter `D:\Root\Logs` bzw. im Log der Auftragsabwicklung.
-- [ ] `%USERPROFILE%\.woy\woy.env` vorhanden und vollständig (`Get-WoyEnvPath`, `Get-WoyValue …`), Vergleich mit
-      `woy.env.example`.
+- [ ] Auftragsabwicklung samt REST starten.
+- [ ] `%USERPROFILE%\.woy\woy.env` vollständig (`Get-WoyEnvPath`, `Get-WoyValue …`), Vergleich mit `woy.env.example`.
 - [ ] `Get-WoyCredential server` liefert eine Anmeldung.
-- [ ] `go`, `mk`, `run` in `C:\woyCode` (flache Struktur).
-- [ ] Kopieren lokal: `run auf copy`.
-- [ ] Kopieren nach TEST-SRV: `run auf copy t`.
-- [ ] Kopieren nach SQL-SRV: `run auf copy s`.
-- [ ] `run auf version`, `run auf desktop` (Desktop-Verknüpfungen neu, keine Ziele unter `D:\Dev`).
+- [ ] `go`, `mk`, `run` in `C:\woyCode`.
+- [ ] Kopieren: `run auf copy`, `run auf copy t` (TEST-SRV), `run auf copy s` (SQL-SRV).
+- [ ] `run auf version`, `run auf desktop` (keine Ziele unter `D:\Dev`).
 - [ ] `Copy-FileWithCredential` kopiert eine Datei auf eine SMB-Freigabe.
 - [ ] `Invoke-Pester ./tests` in `C:\woyCode\Mds`.
-- [ ] Kopieren vom Entwicklungsrechner nach TERRA klären (früher `_Copy2Terra.ps1`).
+- [ ] Kopieren vom Entwicklungsrechner nach TERRA klären.
 
-## 4. Auf von mdsPackage lösen
-
-Gemäß der Entscheidung aus [Luna.md](Luna.md#2-entscheidungen) (MdsTools kommt nicht auf Kundenrechner):
-
-- [ ] `Import-Module mdsPackage` ersetzen in AdminControl `PSDesktopLink.cs` und `DesktopIcons.json`,
-      woyControlCenter `UpdateServer.KorrigierePowerShellLinks`, `xBase/PROCESS.cs`, woyLib `StartPowerShell.cs`
-      (`ImportCmd`).
-- [ ] Modul mit den Auftrags-Cmdlets für Kundenrechner bereitstellen; Update auf einem Testrechner (TEST-SRV) prüfen.
-
-## 5. Aufräumen
+## 4. Aufräumen
 
 - [ ] Leeren Ordner `D:\Dev` löschen.
 - [ ] `C:\woyCode\_Alt\mdsPackage` löschen.
-- [ ] Alte Skripte `Maui/Make-MauiApps.ps1` und `Maui/Make-Single.ps1` entfernen (durch `mk maui` ersetzt).
-- [ ] Doku nachziehen: in [MDS-Development.md](MDS-Development.md#offene-punkte) unter „Erledigt“ eintragen,
-      Stand in [MdsTools.md](MdsTools.md#auftragsabwicklung-nur-windows) aktualisieren, `Luna.md` und `Mars.md`
-      löschen.
+- [ ] `Maui/Make-MauiApps.ps1` und `Maui/Make-Single.ps1` entfernen (durch `mk maui` ersetzt).
+- [ ] Doku auf den aktuellen Stand bringen, `Luna.md` und `Mars.md` löschen.

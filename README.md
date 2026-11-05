@@ -62,8 +62,6 @@ run                    # Werkzeuge des Repos (scripts/_*.ps1) anzeigen
 run Copy -Ziel TEST-SRV
 ```
 
-Ist noch das alte Modul mdsPackage installiert, bricht `Install.ps1` ab; vorher `./Uninstall.ps1` ausführen.
-
 ## Aufbau des Repos
 
 ```text
