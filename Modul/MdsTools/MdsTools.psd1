@@ -12,12 +12,13 @@
 #   2026-11-05  Hubi/Claude  8.3.0: Repos und Root unabhaengig; $mdsDev, DEV_HOME und go dev entfallen
 #   2026-11-05  Hubi/Claude  8.3.1: Offene Punkte MDS-Development (C# auf 8.3, mdsPackage), Umzugsrezept LUNA
 #   2026-11-05  Hubi/Claude  8.3.2: Prompt ~, .env.example, Install/Uninstall ohne mdsPackage; Doku nur aktueller Stand
+#   2026-11-05  Hubi/Claude  8.3.3: push, clone (Invoke-PushAll/-CloneAll), Show-Alias
 #
 @{
     RootModule        = 'MdsTools.psm1'
 
     # Einzige Stelle fuer die Modulversion (A2); $mdsVersion liest sie aus.
-    ModuleVersion     = '8.3.2'
+    ModuleVersion     = '8.3.3'
 
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'
@@ -39,9 +40,10 @@
         'Copy-FileWithCredential', 'Copy-FolderWithCredential',                        # Share.ps1
         'Copy-ToZip', 'Copy-FileToZip', 'Export-FromZip', 'Get-ZipEntry',              # Zip.ps1
         'Update-DotNet', 'Update-PowerShell', 'Show-PowerShell', 'Show-Mds',           # Tools.ps1
-        'go', 'mk', 'run', 'Show-Repos'                                                # Navigation.ps1
+        'go', 'mk', 'run', 'Show-Repos', 'Show-Alias',                                 # Navigation.ps1
+        'Invoke-PushAll', 'Invoke-CloneAll'                                            # Navigation.ps1
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
-    AliasesToExport   = @()
+    AliasesToExport   = @('push', 'clone')
 }

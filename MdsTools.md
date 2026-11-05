@@ -40,6 +40,7 @@
 | 2026-11-05 | 0.34    | Hubert Bieder/Claude | 8.3.1: Offene Punkte in MDS-Development.md (C# auf 8.3, mdsPackage erledigt)            |
 | 2026-11-05 | 0.35    | Hubert Bieder/Claude | MdsTools-Migration.md entfernt (abgeschlossen); Umbenennungen hierher; offene Punkte in Luna.md/Mars.md |
 | 2026-11-05 | 0.36    | Hubert Bieder/Claude | 8.3.2: Nur aktueller Stand: mdsPackage, Umbenennungen, Herkunftsangaben und Erledigtes entfernt |
+| 2026-11-05 | 0.37    | Hubert Bieder/Claude | 8.3.3: `push`, `clone`, `Show-Alias`                                                      |
 
 ---
 
@@ -184,16 +185,21 @@ Die Hilfsfunktionen dazu (`Clear-WoyProcess`, `Write-WoyVersionCS`, `Write-Datei
 
 ## Befehle
 
-| Befehl     | Zweck                                        | Datei            |
-| ---------- | -------------------------------------------- | ---------------- |
-| `go`       | in einen Ordner bzw. ein Repo springen       | `Navigation.ps1` |
-| `mk`       | Programme eines Repos bauen (`Make.ps1`)     | `Navigation.ps1` |
-| `run`      | Repo-Werkzeuge `scripts/_<Name>.ps1` starten | `Navigation.ps1` |
-| `Show-Repos` | alle Repos mit GitHub-Name, letzter Änderung, Kurzbeschreibung | `Navigation.ps1` |
-| `Show-Mds` | mds-Variablen strukturiert anzeigen          | `Tools.ps1`      |
+| Befehl       | Zweck                                                           | Datei            |
+| ------------ | --------------------------------------------------------------- | ---------------- |
+| `go`         | in einen Ordner bzw. ein Repo springen                          | `Navigation.ps1` |
+| `mk`         | Programme eines Repos bauen (`Make.ps1`)                        | `Navigation.ps1` |
+| `run`        | Repo-Werkzeuge `scripts/_<Name>.ps1` starten                    | `Navigation.ps1` |
+| `push`       | alle Repos committen und pushen (`$mdsRepos/PushAll.ps1`)       | `Navigation.ps1` |
+| `clone`      | alle Repos klonen bzw. aktualisieren (`$mdsRepos/CloneAll.ps1`) | `Navigation.ps1` |
+| `Show-Repos` | alle Repos mit GitHub-Name, letzter Änderung, Kurzbeschreibung  | `Navigation.ps1` |
+| `Show-Mds`   | mds-Variablen strukturiert anzeigen                             | `Tools.ps1`      |
+| `Show-Alias` | diese Kurzbefehle mit Beschreibung anzeigen                     | `Navigation.ps1` |
 
-`go`, `mk` und `run` sind kurze Kleinbuchstaben-Befehle für die tägliche Arbeit; sie folgen bewusst nicht dem
-Verb-Substantiv-Schema.
+`go`, `mk`, `run`, `push` und `clone` sind kurze Kleinbuchstaben-Befehle für die tägliche Arbeit; sie folgen
+bewusst nicht dem Verb-Substantiv-Schema. `push` und `clone` sind Aliase auf `Invoke-PushAll` und
+`Invoke-CloneAll`; alle Argumente gehen an das Skript (`push -Repos Net -Message "…"`). Einen Alias `make` gibt es
+nicht, er würde unter macOS `/usr/bin/make` verdecken.
 
 ### go – Sprung in Ordner
 
@@ -448,7 +454,8 @@ Funktionen des Moduls, nach Datei.
 | `Get-TargetFramework`, `Find-CsProj`                             | `Build.ps1`      | nein   | nur intern genutzt                                                                     |
 | `Update-DotNet`, `Update-PowerShell`, `Show-PowerShell`          | `Tools.ps1`      | ja     | interaktiv genutzt                                                                     |
 | `Show-Mds`                                                       | `Tools.ps1`      | ja     | Anzeige der mds-Variablen                                                              |
-| `go`, `mk`, `run`, `Show-Repos`                                  | `Navigation.ps1` | ja     | Befehle für die tägliche Arbeit                                                        |
+| `go`, `mk`, `run`, `Show-Repos`, `Show-Alias`                    | `Navigation.ps1` | ja     | Befehle für die tägliche Arbeit                                                        |
+| `Invoke-PushAll` (`push`), `Invoke-CloneAll` (`clone`)           | `Navigation.ps1` | ja     | rufen `PushAll.ps1`/`CloneAll.ps1` in `$mdsRepos` auf                                  |
 | `Clear-CodeFolder`, `Clear-Target`, `Remove-Folder`              | `FileIO.ps1`     | ja     | interaktiv genutzt                                                                     |
 | `Copy-FileWithCredential`, `Copy-FolderWithCredential`           | `Share.ps1`      | ja     | Windows und macOS, siehe unten                                                         |
 | `Copy-Folder`, `Remove-OldFile`, `Get-DevelopFiles`              | `FileIO.ps1`     | nein   | nur intern genutzt                                                                     |

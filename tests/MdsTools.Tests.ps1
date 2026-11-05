@@ -23,6 +23,7 @@
     1.8.0    2026-11-04  Hubi/Claude   Show-Repos
     1.8.1    2026-11-04  Hubi/Claude   Mindestversion Pester 5.5.0 (Windows bringt 3.4.0 mit)
     1.9.0    2026-11-05  Hubi/Claude   Repos/Root unabhaengig, ohne mdsDev/DEV_HOME/go dev (8.3)
+    1.10.0   2026-11-05  Hubi/Claude   push, clone, Show-Alias
 #>
 
 BeforeAll {
@@ -642,3 +643,42 @@ Describe 'Invoke-Make' {
         (Get-ChildItem $script:log).Name | Should -Match '_MakeErr\.log$'
     }
 }
+
+Describe 'push, clone und Show-Alias' {
+    BeforeAll {
+        # Attrappen der globalen Skripte: schreiben ihre Argumente in eine Datei
+        foreach ($n in 'PushAll', 'CloneAll') {
+            Set-Content -LiteralPath (Join-Path $mdsRepos "$n.ps1") -Value "`"$n `$args`" | Set-Content -LiteralPath (Join-Path `$PSScriptRoot '$n.txt')"
+        }
+    }
+
+    It 'exportiert die Aliase push und clone' {
+        (Get-Module MdsTools).ExportedAliases.Keys | Sort-Object | Should -Be @('clone', 'push')
+        (Get-Command push).Definition | Should -Be 'Invoke-PushAll'
+        (Get-Command clone).Definition | Should -Be 'Invoke-CloneAll'
+    }
+
+    It 'push ruft $mdsRepos/PushAll.ps1 mit allen Argumenten auf' {
+        push -Repos Net -Message Test
+        Get-Content (Join-Path $mdsRepos 'PushAll.txt') | Should -Be 'PushAll -Repos Net -Message Test'
+    }
+
+    It 'clone ruft $mdsRepos/CloneAll.ps1 auf' {
+        clone
+        Get-Content (Join-Path $mdsRepos 'CloneAll.txt') | Should -Be 'CloneAll '
+    }
+
+    It 'meldet einen Fehler, wenn das Skript fehlt' {
+        Remove-Item (Join-Path $mdsRepos 'CloneAll.ps1')
+        # clone reicht alle Argumente durch (auch -ErrorAction), daher die Fehlerausgabe pruefen
+        "$(clone 2>&1)" | Should -BeLike '*CloneAll.ps1 fehlt*'
+    }
+
+    It 'Show-Alias zeigt die Kurzbefehle mit Ziel und Beschreibung' {
+        $zeilen = @(Show-Alias)
+        $zeilen.Befehl | Should -Be @('go', 'mk', 'run', 'push', 'clone', 'Show-Repos', 'Show-Mds', 'Show-Alias')
+        ($zeilen | Where-Object Befehl -eq 'push').Ziel | Should -Be 'Invoke-PushAll'
+        ($zeilen | Where-Object Befehl -eq 'go').Beschreibung | Should -Be 'Wechselt in einen Ordner.'
+    }
+}
+

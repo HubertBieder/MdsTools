@@ -55,6 +55,9 @@ Danach in einer neuen Shell:
 Show-Mds               # Version, woy-Stand und alle Ordner anzeigen
 Show-Mds -F            # zusätzlich alle Befehle des Moduls
 Show-Repos             # alle Repos: GitHub-Name, letzte Änderung, Kurzbeschreibung
+Show-Alias             # Kurzbefehle: go, mk, run, push, clone, Show-*
+push                   # alle Repos committen und pushen (PushAll.ps1)
+clone                  # alle Repos klonen bzw. aktualisieren (CloneAll.ps1)
 go                     # nach Repos springen (go root: nach Root)
 go net                 # ins Repo Net springen
 mk                     # im Repo-Ordner: alle Programme bauen

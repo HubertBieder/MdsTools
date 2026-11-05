@@ -12,8 +12,9 @@
 #   2026-11-04  Hubi/Claude  run: globale Skripte aus Mds/scripts, eindeutige Abkuerzung (run back)
 #   2026-11-04  Hubi/Claude  Show-Repos: Repos mit GitHub-Name, letzter Aenderung, Kurzbeschreibung
 #   2026-11-05  Hubi/Claude  go dev entfaellt, go ohne Argument = go repos (8.3)
+#   2026-11-05  Hubi/Claude  push/clone (Invoke-PushAll/-CloneAll), Show-Alias (8.3.3)
 #
-# Oeffentlich: go, mk, run
+# Oeffentlich: go, mk, run, Show-Repos, Invoke-PushAll (push), Invoke-CloneAll (clone), Show-Alias
 #======================================================================
 
 # [intern] Git-Repos unter $mdsRepos: nur Ordner mit .git (Ordner oder Datei bei Worktrees).
@@ -376,5 +377,71 @@ function Show-Repos {
             $zeile.Remote = "$url"
         }
         [pscustomobject]$zeile
+    }
+}
+
+# [intern] Pfad eines globalen Skripts in $mdsRepos (von Install.ps1 aus Modul/Skripte kopiert).
+# Fehlt es, kommt eine Fehlermeldung und $null zurueck.
+# 2026-11-05 Hubi/Claude: erstellt fuer push/clone
+function Get-GlobalScript([string] $Name) {
+    $pfad = Join-Path $mdsRepos $Name
+    if (Test-Path -LiteralPath $pfad -PathType Leaf) { return $pfad }
+    Write-Error "$Name fehlt in $mdsRepos - ./Install.ps1 im Repo Mds ausfuehren."
+    return $null
+}
+
+<#
+.SYNOPSIS
+    Committet und pusht alle Repos ($mdsRepos/PushAll.ps1), Alias push.
+.DESCRIPTION
+    Alle Argumente werden an PushAll.ps1 weitergereicht (-Repos, -Message).
+.EXAMPLE
+    push
+.EXAMPLE
+    push -Repos Net, Maui -Message "Neue Logging-Klasse"
+#>
+# 2026-11-05 Hubi/Claude: erstellt
+function Invoke-PushAll {
+    $skript = Get-GlobalScript 'PushAll.ps1'
+    if ($skript) { & $skript @args }
+}
+
+<#
+.SYNOPSIS
+    Klont bzw. aktualisiert alle Repos ($mdsRepos/CloneAll.ps1), Alias clone.
+.DESCRIPTION
+    Alle Argumente werden an CloneAll.ps1 weitergereicht.
+.EXAMPLE
+    clone
+#>
+# 2026-11-05 Hubi/Claude: erstellt
+function Invoke-CloneAll {
+    $skript = Get-GlobalScript 'CloneAll.ps1'
+    if ($skript) { & $skript @args }
+}
+
+Set-Alias -Name push -Value Invoke-PushAll
+Set-Alias -Name clone -Value Invoke-CloneAll
+
+<#
+.SYNOPSIS
+    Zeigt die Kurzbefehle von MdsTools (go, mk, run, push, clone, Show-*) mit Beschreibung.
+.DESCRIPTION
+    Je Befehl: Name, Ziel (bei Aliasen die Funktion dahinter) und die Kurzbeschreibung.
+.EXAMPLE
+    Show-Alias
+#>
+# 2026-11-05 Hubi/Claude: erstellt
+function Show-Alias {
+    [CmdletBinding()]
+    param()
+
+    $beschreibung = @{}
+    foreach ($befehl in Get-MdsCommand) { $beschreibung[$befehl.Name] = $befehl.Beschreibung }
+    foreach ($name in 'go', 'mk', 'run', 'push', 'clone', 'Show-Repos', 'Show-Mds', 'Show-Alias') {
+        $cmd = Get-Command -Name $name -Module MdsTools -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        $ziel = if ($cmd.CommandType -eq 'Alias') { $cmd.Definition } else { $cmd.Name }
+        [pscustomobject]@{ Befehl = $name; Ziel = $ziel; Beschreibung = $beschreibung[$ziel] }
     }
 }
