@@ -271,8 +271,8 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
   der Auftragsabwicklung auf (`Invoke-ArtImportDownload`, `Invoke-XRechnung`, `Invoke-Backup` …), die MdsTools
   **nicht** enthält. Vor der Umstellung ist zu entscheiden, welches Modul diese Cmdlets auf Kundenrechnern
   bereitstellt; erst dann wird `ImportCmd` in `PSDesktopLink.cs`/`UpdateServer.cs` ersetzt.
-- Umzug LUNA und MARS nach [Umstellung auf MdsTools 8.3](#umstellung-auf-mdstools-83-dev-entfällt) (braucht `sudo`
-  bzw. Admin, Dienste stehen kurz still).
+- Umzug MARS nach [Umstellung auf MdsTools 8.3](#umstellung-auf-mdstools-83-dev-entfällt) (`D:\Dev\Root` →
+  `D:\Root`, braucht Admin, Dienste stehen kurz still).
 
 Erledigt:
 
@@ -284,6 +284,9 @@ Erledigt:
 - 05.11.2026: mdsPackage ist auf LUNA und MARS nicht mehr installiert, `Repos/mdsPackage` gibt es nicht mehr
   (E3 in [MdsTools-Migration.md](MdsTools-Migration.md)). Reste auf MARS unter `C:\woyCode\_Alt\mdsPackage`;
   das GitHub-Repo bleibt für die Kundenrechner (siehe oben) erhalten.
+- 05.11.2026: LUNA umgezogen (`~/Repos`, `~/Root`): Dienst gestoppt, Config-Pfade korrigiert (Sicherungen
+  `*.bak-83`), MdsTools 8.3.1 installiert, TaskScheduler/Tasks, RestServices und TaskAdmin neu gebaut, Dienst mit
+  `DEV_ROOT=~/Root` neu installiert; `~/Dev` entfernt.
 
 ## Umstellung auf MdsTools 8.3 (Dev entfällt)
 
