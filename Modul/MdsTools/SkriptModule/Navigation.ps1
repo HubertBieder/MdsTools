@@ -13,6 +13,7 @@
 #   2026-11-04  Hubi/Claude  Show-Repos: Repos mit GitHub-Name, letzter Aenderung, Kurzbeschreibung
 #   2026-11-05  Hubi/Claude  go dev entfaellt, go ohne Argument = go repos (8.3)
 #   2026-11-05  Hubi/Claude  push/clone (Invoke-PushAll/-CloneAll), Show-Alias (8.3.3)
+#   2026-11-06  Hubi/Claude  go dev/go home = go repos (8.3.4)
 #
 # Oeffentlich: go, mk, run, Show-Repos, Invoke-PushAll (push), Invoke-CloneAll (clone), Show-Alias
 #======================================================================
@@ -26,25 +27,25 @@ function Get-GoRepo {
         Select-Object -ExpandProperty Name
 }
 
-# [intern] Liefert alle gueltigen Sprungziele fuer go: repos, root und die Repo-Kurznamen.
+# [intern] Liefert alle gueltigen Sprungziele fuer go: repos, dev, home, root und die Repo-Kurznamen.
 function Get-GoTarget {
-    return @('repos', 'root') + @(Get-GoRepo)
+    return @('repos', 'dev', 'home', 'root') + @(Get-GoRepo)
 }
 
 # [public] go — Wechselt in einen Ordner. Gross-/Kleinschreibung spielt keine Rolle.
-#   go / go repos -> $mdsRepos
+#   go / go repos / go dev / go home -> $mdsRepos
 #   go root       -> $mdsRoot
 #   go <Kurzname> -> $mdsRepos/<Kurzname> (nur Ordner mit .git)
-# 2026-11-05 Hubi/Claude: go dev entfaellt ($mdsDev gibt es nicht mehr), go = go repos (8.3)
+# 2026-11-06 Hubi/Claude: go dev und go home wie go repos (8.3.4)
 function go {
     [CmdletBinding()]
     param
     (
-        [Parameter(Position = 0, Mandatory = $false, HelpMessage = "repos, root oder Repo-Kurzname")]
+        [Parameter(Position = 0, Mandatory = $false, HelpMessage = "repos, dev, home, root oder Repo-Kurzname")]
         [string] $Ziel = 'repos'
     )
     switch ($Ziel.ToLowerInvariant()) {
-        'repos' { Set-Location -LiteralPath $mdsRepos; return }
+        { $_ -in 'repos', 'dev', 'home' } { Set-Location -LiteralPath $mdsRepos; return }
         'root' { Set-Location -LiteralPath $mdsRoot; return }
     }
     $repo = Get-GoRepo | Where-Object { $_ -eq $Ziel } | Select-Object -First 1

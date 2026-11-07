@@ -183,7 +183,8 @@ Get-ChildItem $mdsRepos -Recurse -Include *.csproj,*.sln,*.slnx,*.props,*.code-w
 
 Die globalen Skripte (`Modul/Skripte/` in diesem Repo, installiert nach `$mdsRepos`) arbeiten mit einer Tabelle
 GitHub-Repo → Kurzname. Vorhandene Repos werden per `pull --ff-only` aktualisiert statt gelöscht; bei lokalen
-Änderungen bricht das Skript mit Warnung ab.
+Änderungen bricht das Skript mit Warnung ab. Hat CloneAll das Repo Mds neu geklont oder neue Commits geholt,
+ruft es danach sofort `Mds/Install.ps1` auf (gilt auch für `clone` und CloneMDS).
 
 ```powershell
 # 2026-10-31 Hubi/Claude: GitHub-Repo -> lokaler Kurzname

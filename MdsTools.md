@@ -41,6 +41,8 @@
 | 2026-11-05 | 0.35    | Hubert Bieder/Claude | MdsTools-Migration.md entfernt (abgeschlossen); Umbenennungen hierher; offene Punkte in Luna.md/Mars.md |
 | 2026-11-05 | 0.36    | Hubert Bieder/Claude | 8.3.2: Nur aktueller Stand: mdsPackage, Umbenennungen, Herkunftsangaben und Erledigtes entfernt |
 | 2026-11-05 | 0.37    | Hubert Bieder/Claude | 8.3.3: `push`, `clone`, `Show-Alias`                                                      |
+| 2026-11-06 | 0.38    | Hubert Bieder/Claude | 8.3.4: `go dev`, `go home` (wie `go repos`)                                              |
+| 2026-11-06 | 0.39    | Hubert Bieder/Claude | CloneAll: Mds geändert → sofort `Mds/Install.ps1`                                         |
 
 ---
 
@@ -154,7 +156,7 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | ------------- | ------------------- | ------------------- | -------------------------------------------- |
 | `$mdsVersion` | `8.x` aus Manifest  | `8.x` aus Manifest  | Modulversion, auf allen Systemen gleich (A2) |
 | `$mdsWoy`     | `0`                 | `26`                | woy-Stand des Systems, `[int]`               |
-| `$mdsRepos`   | `~/Repos`           | `C:\woyCode`        | Git-Clones, Ziel von `go` und `go repos`     |
+| `$mdsRepos`   | `~/Repos`           | `C:\woyCode`        | Git-Clones, Ziel von `go` (`repos`/`dev`/`home`) |
 | `$mdsRoot`    | `~/Root`            | `D:\Root` ¹         | Laufzeitumgebung, Ziel von `go root`         |
 | `$mdsBin`     | `$mdsRoot/Bin`      | `$mdsRoot\Bin`      | gebaute Programme, steht im `PATH`           |
 | `$mdsConfig`  | `$mdsRoot/Config`   | `$mdsRoot\Config`   | Konfiguration je Programm                    |
@@ -198,7 +200,8 @@ Die Hilfsfunktionen dazu (`Clear-WoyProcess`, `Write-WoyVersionCS`, `Write-Datei
 
 `go`, `mk`, `run`, `push` und `clone` sind kurze Kleinbuchstaben-Befehle für die tägliche Arbeit; sie folgen
 bewusst nicht dem Verb-Substantiv-Schema. `push` und `clone` sind Aliase auf `Invoke-PushAll` und
-`Invoke-CloneAll`; alle Argumente gehen an das Skript (`push -Repos Net -Message "…"`). Einen Alias `make` gibt es
+`Invoke-CloneAll`; alle Argumente gehen an das Skript (`push -Repos Net -Message "…"`). Holt `clone` neue Commits
+für Mds (oder klont es neu), läuft danach sofort `Mds/Install.ps1`. Einen Alias `make` gibt es
 nicht, er würde unter macOS `/usr/bin/make` verdecken.
 
 ### go – Sprung in Ordner
@@ -210,11 +213,13 @@ Arguments spielt keine Rolle.
 | ----------- | ------------------------------------------------------------ |
 | `go`        | `$mdsRepos` (wie `go repos`)                                 |
 | `go repos`  | `$mdsRepos`                                                  |
+| `go dev`    | `$mdsRepos` (wie `go repos`)                                 |
+| `go home`   | `$mdsRepos` (wie `go repos`)                                 |
 | `go root`   | `$mdsRoot`                                                   |
 | `go <Kurz>` | `$mdsRepos/<Kurz>` (z. B. `go net`), nur Ordner mit `.git`   |
 
-- Die Namen `repos` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
-- Unter Windows führen `go` und `go repos` nach `C:\woyCode`, `go root` nach `D:\Root`
+- Die Namen `repos`, `dev`, `home` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
+- Unter Windows führen `go`, `go repos`, `go dev` und `go home` nach `C:\woyCode`, `go root` nach `D:\Root`
   (ohne Laufwerk D: nach `C:\Root`).
 - Außer den festen Zielen springt `go` nur in Ordner unter `$mdsRepos`, die ein `.git` enthalten. Unter Windows
   sind damit die Laufzeitordner (`Bin`, `Config`, …) ausgeschlossen, die woy-Repos der Auftragsabwicklung aber

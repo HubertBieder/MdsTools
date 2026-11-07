@@ -24,6 +24,7 @@
     1.8.1    2026-11-04  Hubi/Claude   Mindestversion Pester 5.5.0 (Windows bringt 3.4.0 mit)
     1.9.0    2026-11-05  Hubi/Claude   Repos/Root unabhaengig, ohne mdsDev/DEV_HOME/go dev (8.3)
     1.10.0   2026-11-05  Hubi/Claude   push, clone, Show-Alias
+    1.11.0   2026-11-06  Hubi/Claude   go dev/go home
 #>
 
 BeforeAll {
@@ -152,9 +153,12 @@ Describe 'go' {
         (Get-Location).Path | Should -Be $mdsRepos
     }
 
-    It 'kennt das Ziel dev nicht mehr' {
-        go dev 3>$null
-        (Get-Location).Path | Should -Be $TestDrive.ToString()
+    It 'springt mit dev und home nach $mdsRepos' {
+        go dev
+        (Get-Location).Path | Should -Be $mdsRepos
+        Set-Location $TestDrive
+        go HOME
+        (Get-Location).Path | Should -Be $mdsRepos
     }
 
     It 'springt nach root (Gross-/Kleinschreibung egal)' {

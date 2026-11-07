@@ -7,6 +7,7 @@
       - nicht vorhanden          -> git clone nach Repos/<Kurzname>
       - vorhanden, sauber        -> git pull --ff-only
       - vorhanden, mit lokalen Änderungen -> Warnung, wird übersprungen (nichts wird gelöscht)
+    Wurde Mds neu geklont oder hat der pull neue Commits geholt, läuft danach sofort Mds/Install.ps1.
     macOS/Linux: Repos ist der Ordner, in dem das Skript liegt (~/Repos).
     Windows:     feste Basis C:\woyCode, die Repos liegen direkt darin (wie $mdsRepos in MdsTools).
     $env:DEV_REPOS übersteuert.
@@ -31,13 +32,15 @@
                                        Zielverzeichnis am Ende ausgeben
     3.3.0    2026-11-04  Hubi/Claude   Im Repo unter Modul/Skripte (statt Skripte)
     3.4.0    2026-11-05  Hubi/Claude   Ohne Dev-Ordner: Skript liegt direkt in Repos (~/Repos), DEV_HOME entfällt
+    3.5.0    2026-11-06  Hubi/Claude   Mds geändert (neu geklont oder neue Commits) -> sofort Mds/Install.ps1;
+                                       Status 'Aktuell', wenn der pull nichts geholt hat
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.4.0'
+$ScriptVersion = '3.5.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -103,6 +106,9 @@ if (-not (Test-Path $ReposDir)) {
     New-Item -Path $ReposDir -ItemType Directory -Force | Out-Null
 }
 
+# Wird auf $true gesetzt, wenn Mds neu geklont wurde oder der pull neue Commits geholt hat.
+$mdsGeaendert = $false
+
 Write-Host "CloneAll $ScriptVersion auf $hostName ($osName) - Repos: $ReposDir" -ForegroundColor Cyan
 
 $result = foreach ($repo in $auswahl.Keys) {
@@ -117,8 +123,18 @@ $result = foreach ($repo in $auswahl.Keys) {
             [pscustomobject]@{ Repo = $kurz; GitHub = $repo; Status = 'Übersprungen (lokale Änderungen)' }
             continue
         }
+        $vorher = git -C $target rev-parse HEAD
         git -C $target pull --ff-only
-        $status = if ($LASTEXITCODE -eq 0) { 'Aktualisiert (pull)' } else { "FEHLER beim pull ($LASTEXITCODE)" }
+        if ($LASTEXITCODE -ne 0) {
+            $status = "FEHLER beim pull ($LASTEXITCODE)"
+        }
+        elseif ((git -C $target rev-parse HEAD) -ne $vorher) {
+            $status = 'Aktualisiert (pull)'
+            if ($kurz -eq 'Mds') { $mdsGeaendert = $true }
+        }
+        else {
+            $status = 'Aktuell'
+        }
     }
     elseif (Test-Path $target) {
         Write-Warning "$target existiert, ist aber kein Git-Repository - übersprungen."
@@ -127,6 +143,7 @@ $result = foreach ($repo in $auswahl.Keys) {
     else {
         git clone "$GitHubBase$repo.git" $target
         $status = if ($LASTEXITCODE -eq 0) { 'Neu geklont' } else { "FEHLER beim clone ($LASTEXITCODE)" }
+        if ($LASTEXITCODE -eq 0 -and $kurz -eq 'Mds') { $mdsGeaendert = $true }
     }
     [pscustomobject]@{ Repo = $kurz; GitHub = $repo; Status = $status }
 }
@@ -134,3 +151,19 @@ $result = foreach ($repo in $auswahl.Keys) {
 Write-Host ''
 $result | Format-Table -AutoSize | Out-Host
 Write-Host "Zielverzeichnis: $ReposDir" -ForegroundColor Cyan
+
+# --- Mds geaendert: MdsTools sofort neu installieren (Modul, Profil, globale Skripte) ---
+# 2026-11-06 Hubi/Claude: erstellt
+if ($mdsGeaendert) {
+    $install = Join-Path (Join-Path $ReposDir 'Mds') 'Install.ps1'
+    Write-Host "`nMds wurde geändert - $install wird ausgeführt." -ForegroundColor Cyan
+    if ($PSVersionTable.PSVersion -lt [version]'7.6') {
+        Write-Warning "Install.ps1 braucht PowerShell 7.6 - bitte in pwsh ausführen: $install"
+    }
+    elseif (-not (Test-Path -LiteralPath $install -PathType Leaf)) {
+        Write-Warning "$install nicht gefunden."
+    }
+    else {
+        & $install
+    }
+}

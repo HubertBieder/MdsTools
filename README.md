@@ -57,8 +57,8 @@ Show-Mds -F            # zusätzlich alle Befehle des Moduls
 Show-Repos             # alle Repos: GitHub-Name, letzte Änderung, Kurzbeschreibung
 Show-Alias             # Kurzbefehle: go, mk, run, push, clone, Show-*
 push                   # alle Repos committen und pushen (PushAll.ps1)
-clone                  # alle Repos klonen bzw. aktualisieren (CloneAll.ps1)
-go                     # nach Repos springen (go root: nach Root)
+clone                  # alle Repos klonen bzw. aktualisieren (CloneAll.ps1); Mds geändert → Install.ps1
+go                     # nach Repos springen (auch go dev, go home; go root: nach Root)
 go net                 # ins Repo Net springen
 mk                     # im Repo-Ordner: alle Programme bauen
 run                    # Werkzeuge des Repos (scripts/_*.ps1) anzeigen
