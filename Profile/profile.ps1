@@ -9,6 +9,7 @@
 #               31.10.2026 Hubi/Claude: Umstellung auf MdsTools; cd*/2*-Aliase durch go ersetzt,
 #                          woy-Variablen durch $mds*, zip-Alias entfernt (verdeckte /usr/bin/zip)
 #               05.11.2026 Hubi/Claude: prompt zeigt den User-Ordner als ~ (PS ~/Repos>)
+#               08.11.2026 Hubi/Claude: Anaconda auf macOS (Homebrew), $condaRoot/Get-CondaPython, py/py313/py315
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -23,28 +24,31 @@ function Save-Develop() {
     }
 }
 
-function Use-Conda() {
-    if ($IsWindows) {
-        #region conda initialize
-        # !! Contents within this block are managed by 'conda init' !!
-        If (Test-Path "C:\ProgramData\Anaconda\Scripts\conda.exe") {
-            (& "C:\ProgramData\Anaconda\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Where-Object { $_ } | Invoke-Expression
-            Write-Host "Conda Umgebung initialisiert" -ForegroundColor Green
-        }
-        else {
-            Write-Warning "Conda nicht installiert"
-        }
-        #endregion
+# Anaconda-Basisordner: Windows systemweit, macOS per Homebrew (brew install --cask anaconda)
+$condaRoot = if ($IsWindows) { "C:\ProgramData\Anaconda" } elseif ($IsMacOS) { "/opt/homebrew/anaconda3" } else { $null }
+
+# Python einer Conda-Umgebung ('base' = Anaconda-Basis); envs liegen unter $condaRoot/envs oder ~/.conda/envs
+function Get-CondaPython([string] $envName = 'base') {
+    $exe = if ($IsWindows) { 'python.exe' } else { 'bin/python' }
+    $dirs = if ($envName -eq 'base') { @($condaRoot) } else {
+        @((Join-Path $condaRoot "envs/$envName"), (Join-Path $HOME ".conda/envs/$envName"))
     }
-    elseif ($IsMacOS) {
-        # Auf macOS ist Conda aktuell nicht installiert; greift automatisch, sobald es unter /opt/anaconda3 liegt
-        If (Test-Path "/opt/anaconda3/bin/conda") {
-            (& "/opt/anaconda3/bin/conda" "shell.powershell" "hook") | Out-String | Where-Object { $_ } | Invoke-Expression
-            Write-Host "Conda Umgebung initialisiert" -ForegroundColor Green
-        }
-        else {
-            Write-Warning "Conda ist auf macOS (noch) nicht installiert"
-        }
+    foreach ($d in $dirs) {
+        $p = Join-Path $d $exe
+        if (Test-Path -LiteralPath $p) { return $p }
+    }
+    throw "Conda-Umgebung '$envName' nicht gefunden"
+}
+
+# Aktiviert conda in der aktuellen Sitzung (danach: conda activate py314)
+function Use-Conda() {
+    $conda = if ($IsWindows) { Join-Path $condaRoot 'Scripts\conda.exe' } else { Join-Path $condaRoot 'bin/conda' }
+    if (Test-Path -LiteralPath $conda) {
+        (& $conda "shell.powershell" "hook") | Out-String | Where-Object { $_ } | Invoke-Expression
+        Write-Host "Conda Umgebung initialisiert" -ForegroundColor Green
+    }
+    else {
+        Write-Warning "Conda nicht installiert ($conda)"
     }
 }
 
@@ -80,6 +84,16 @@ if ($IsWindows) {
     function py_311 { & "C:\Users\huber\.conda\envs\hubi_311\python.exe" @args }
     Set-Alias -Name py -Value py_311
 
-    function pyBase { & "C:\ProgramData\Anaconda\python.exe" @args }
+    function pyBase { & (Get-CondaPython base) @args }
+    Set-Alias -Name pyb -Value pyBase
+}
+elseif ($IsMacOS) {
+    # Umgebungen: py314 (Alltag), py313 (Kompatibilitaet/ML), py315 (nur testen); base bleibt unveraendert
+    function py_314 { & (Get-CondaPython py314) @args }
+    Set-Alias -Name py -Value py_314
+    function py313 { & (Get-CondaPython py313) @args }
+    function py315 { & (Get-CondaPython py315) @args }
+
+    function pyBase { & (Get-CondaPython base) @args }
     Set-Alias -Name pyb -Value pyBase
 }
