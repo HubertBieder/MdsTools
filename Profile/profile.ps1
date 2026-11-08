@@ -10,6 +10,7 @@
 #                          woy-Variablen durch $mds*, zip-Alias entfernt (verdeckte /usr/bin/zip)
 #               05.11.2026 Hubi/Claude: prompt zeigt den User-Ordner als ~ (PS ~/Repos>)
 #               08.11.2026 Hubi/Claude: Anaconda auf macOS (Homebrew), $condaRoot/Get-CondaPython, py/py313/py315
+#               08.11.2026 Hubi/Claude: MARS auf Anaconda 2026.07, py/py313/py315/pyb fuer Windows und macOS gleich
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -79,16 +80,15 @@ if ($IsWindows) {
     function androidbuild { dotnet build src/Apps/DataBrowser/DataBrowser.csproj --framework net10.0-android --configuration Debug -t:Run -p:AdbTarget=-d }
     New-Alias -Name "nubia" -Value androidbuild -Force
 
-    function data_cli { & "C:\Users\huber\.conda\envs\hubi_311\python.exe" (Join-Path $mdsRepos 'PHB/src/DataCLI/Data_cli.py') }
+    # DataCLI (PHB) laeuft weiter in der alten Umgebung Hubi_311 (Python 3.11)
+    function data_cli { & (Get-CondaPython Hubi_311) (Join-Path $mdsRepos 'PHB/src/DataCLI/Data_cli.py') @args }
     Set-Alias -Name DataCLI -Value data_cli -Force -option private
-    function py_311 { & "C:\Users\huber\.conda\envs\hubi_311\python.exe" @args }
-    Set-Alias -Name py -Value py_311
-
-    function pyBase { & (Get-CondaPython base) @args }
-    Set-Alias -Name pyb -Value pyBase
+    function py311 { & (Get-CondaPython Hubi_311) @args }
 }
-elseif ($IsMacOS) {
-    # Umgebungen: py314 (Alltag), py313 (Kompatibilitaet/ML), py315 (nur testen); base bleibt unveraendert
+
+# Python aus Anaconda, auf Windows (MARS) und macOS (LUNA) identisch:
+# py314 (Alltag), py313 (Kompatibilitaet/ML), py315 (nur testen); base bleibt unveraendert
+if ($IsWindows -or $IsMacOS) {
     function py_314 { & (Get-CondaPython py314) @args }
     Set-Alias -Name py -Value py_314
     function py313 { & (Get-CondaPython py313) @args }
