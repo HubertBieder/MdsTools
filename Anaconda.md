@@ -14,6 +14,48 @@ die `base`-Umgebung bleibt unverändert.
 
 Python 3.10 wird nicht mehr installiert (Anaconda-Support endet im Oktober 2026).
 
+## Nutzung
+
+**Umgebung aktivieren** (gilt für die aktuelle pwsh-Sitzung; danach sind `python` und `pip` die der Umgebung):
+
+```powershell
+Use-Conda                 # conda in dieser Sitzung verfügbar machen (einmal je Sitzung)
+
+conda activate py314      # Python 3.14
+conda activate py313      # Python 3.13
+conda activate py315      # Python 3.15
+conda activate base       # Anaconda selbst
+
+conda deactivate          # zurück zur vorherigen Umgebung
+conda env list            # alle Umgebungen, * = aktiv
+python --version          # Kontrolle
+```
+
+**Ohne Aktivieren** direkt starten (Profil-Befehle, z. B. für einzelne Skripte):
+
+```powershell
+py skript.py              # Python 3.14 (py314)
+py313 skript.py           # Python 3.13
+py315 skript.py           # Python 3.15
+pyb --version             # base
+```
+
+**Pakete installieren** (nie in `base`):
+
+```powershell
+conda activate py313
+conda install numpy       # bevorzugt aus conda
+pip install ultralytics   # was es nur bei pip gibt
+conda list                # installierte Pakete der aktiven Umgebung
+```
+
+**Umgebung neu anlegen oder entfernen:**
+
+```powershell
+conda create -n py312 python=3.12 -y
+conda remove -n py312 --all -y
+```
+
 ## Installation auf macOS (LUNA)
 
 Anaconda 2026.07 über Homebrew; es gibt nur noch Apple Silicon (arm64). Ziel: `/opt/homebrew/anaconda3`.
@@ -54,12 +96,6 @@ Anaconda liegt systemweit unter `C:\ProgramData\Anaconda`. Die Umgebungen werden
 | `Use-Conda`               | conda in der aktuellen Sitzung aktivieren, danach z. B. `conda activate py313`              |
 | `py`, `py313`, `py315`, `pyb` | macOS: Python der jeweiligen Umgebung direkt starten (`py` = py314)                     |
 | `py`, `DataCLI`, `pyb`    | Windows: `py` = Umgebung `hubi_311`, `DataCLI` startet PHB/src/DataCLI                       |
-
-```powershell
-py --version                  # Python 3.14.x
-py313 -m pip install ultralytics
-Use-Conda; conda activate py313
-```
 
 ## VS Code
 
