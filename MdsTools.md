@@ -43,6 +43,7 @@
 | 2026-11-05 | 0.37    | Hubert Bieder/Claude | 8.3.3: `push`, `clone`, `Show-Alias`                                                      |
 | 2026-11-06 | 0.38    | Hubert Bieder/Claude | 8.3.4: `go dev`, `go home` (wie `go repos`)                                              |
 | 2026-11-06 | 0.39    | Hubert Bieder/Claude | CloneAll: Mds geändert → sofort `Mds/Install.ps1`                                         |
+| 2026-11-08 | 0.40    | Hubert Bieder/Claude | 8.3.5: `go home` nach `~`                                                                 |
 
 ---
 
@@ -214,13 +215,13 @@ Arguments spielt keine Rolle.
 | `go`        | `$mdsRepos` (wie `go repos`)                                 |
 | `go repos`  | `$mdsRepos`                                                  |
 | `go dev`    | `$mdsRepos` (wie `go repos`)                                 |
-| `go home`   | `$mdsRepos` (wie `go repos`)                                 |
+| `go home`   | `~` (`$HOME`)                                                |
 | `go root`   | `$mdsRoot`                                                   |
 | `go <Kurz>` | `$mdsRepos/<Kurz>` (z. B. `go net`), nur Ordner mit `.git`   |
 
 - Die Namen `repos`, `dev`, `home` und `root` sind reserviert und dürfen kein Repo-Kurzname sein.
-- Unter Windows führen `go`, `go repos`, `go dev` und `go home` nach `C:\woyCode`, `go root` nach `D:\Root`
-  (ohne Laufwerk D: nach `C:\Root`).
+- Unter Windows führen `go`, `go repos` und `go dev` nach `C:\woyCode`, `go home` ins Benutzerprofil, `go root`
+  nach `D:\Root` (ohne Laufwerk D: nach `C:\Root`).
 - Außer den festen Zielen springt `go` nur in Ordner unter `$mdsRepos`, die ein `.git` enthalten. Unter Windows
   sind damit die Laufzeitordner (`Bin`, `Config`, …) ausgeschlossen, die woy-Repos der Auftragsabwicklung aber
   erreichbar; unter macOS gibt es diese nicht.

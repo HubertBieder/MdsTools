@@ -14,6 +14,7 @@
 #   2026-11-05  Hubi/Claude  go dev entfaellt, go ohne Argument = go repos (8.3)
 #   2026-11-05  Hubi/Claude  push/clone (Invoke-PushAll/-CloneAll), Show-Alias (8.3.3)
 #   2026-11-06  Hubi/Claude  go dev/go home = go repos (8.3.4)
+#   2026-11-08  Hubi/Claude  go home -> ~ (8.3.5)
 #
 # Oeffentlich: go, mk, run, Show-Repos, Invoke-PushAll (push), Invoke-CloneAll (clone), Show-Alias
 #======================================================================
@@ -33,10 +34,11 @@ function Get-GoTarget {
 }
 
 # [public] go — Wechselt in einen Ordner. Gross-/Kleinschreibung spielt keine Rolle.
-#   go / go repos / go dev / go home -> $mdsRepos
+#   go / go repos / go dev -> $mdsRepos
+#   go home       -> ~ ($HOME)
 #   go root       -> $mdsRoot
 #   go <Kurzname> -> $mdsRepos/<Kurzname> (nur Ordner mit .git)
-# 2026-11-06 Hubi/Claude: go dev und go home wie go repos (8.3.4)
+# 2026-11-08 Hubi/Claude: go home -> ~ (8.3.5)
 function go {
     [CmdletBinding()]
     param
@@ -45,7 +47,8 @@ function go {
         [string] $Ziel = 'repos'
     )
     switch ($Ziel.ToLowerInvariant()) {
-        { $_ -in 'repos', 'dev', 'home' } { Set-Location -LiteralPath $mdsRepos; return }
+        { $_ -in 'repos', 'dev' } { Set-Location -LiteralPath $mdsRepos; return }
+        'home' { Set-Location -LiteralPath $HOME; return }
         'root' { Set-Location -LiteralPath $mdsRoot; return }
     }
     $repo = Get-GoRepo | Where-Object { $_ -eq $Ziel } | Select-Object -First 1

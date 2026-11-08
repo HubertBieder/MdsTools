@@ -25,6 +25,7 @@
     1.9.0    2026-11-05  Hubi/Claude   Repos/Root unabhaengig, ohne mdsDev/DEV_HOME/go dev (8.3)
     1.10.0   2026-11-05  Hubi/Claude   push, clone, Show-Alias
     1.11.0   2026-11-06  Hubi/Claude   go dev/go home
+    1.12.0   2026-11-08  Hubi/Claude   go home -> ~
 #>
 
 BeforeAll {
@@ -153,12 +154,14 @@ Describe 'go' {
         (Get-Location).Path | Should -Be $mdsRepos
     }
 
-    It 'springt mit dev und home nach $mdsRepos' {
+    It 'springt mit dev nach $mdsRepos' {
         go dev
         (Get-Location).Path | Should -Be $mdsRepos
-        Set-Location $TestDrive
+    }
+
+    It 'springt mit home nach ~' {
         go HOME
-        (Get-Location).Path | Should -Be $mdsRepos
+        (Get-Location).Path | Should -Be $HOME
     }
 
     It 'springt nach root (Gross-/Kleinschreibung egal)' {
