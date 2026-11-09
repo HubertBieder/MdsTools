@@ -76,6 +76,11 @@ $os = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "MacOS" } else { "Linux"
 Write-Host (Show-Header -os $os) -ForegroundColor blue
 Remove-Variable os
 
+if ($IsMacOS) {
+    $env:JAVA_HOME = "$HOME/Library/Android/jdk"
+    $env:ANDROID_HOME = "$HOME/Library/Android/sdk"
+    $env:PATH = "$env:PATH:$env:ANDROID_HOME/platform-tools:$env:ANDROID_HOME/emulator"
+}
 if ($IsWindows) {
     function androidbuild { dotnet build src/Apps/DataBrowser/DataBrowser.csproj --framework net10.0-android --configuration Debug -t:Run -p:AdbTarget=-d }
     New-Alias -Name "nubia" -Value androidbuild -Force
