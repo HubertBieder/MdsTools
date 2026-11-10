@@ -11,6 +11,7 @@
 #               05.11.2026 Hubi/Claude: prompt zeigt den User-Ordner als ~ (PS ~/Repos>)
 #               08.11.2026 Hubi/Claude: Anaconda auf macOS (Homebrew), $condaRoot/Get-CondaPython, py/py313/py315
 #               08.11.2026 Hubi/Claude: MARS auf Anaconda 2026.07, py/py313/py315/pyb fuer Windows und macOS gleich
+#               10.11.2026 Hubi/Claude: macOS: ping sendet wie unter Windows 4 Pakete
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -77,6 +78,11 @@ Write-Host (Show-Header -os $os) -ForegroundColor blue
 Remove-Variable os
 
 if ($IsMacOS) {
+    # ping wie unter Windows: 4 Pakete, sofern kein -c angegeben ist (ping mars, ping 192.168.104.59)
+    function ping {
+        if ($args -contains '-c') { & /sbin/ping @args } else { & /sbin/ping -c 4 @args }
+    }
+
     $env:JAVA_HOME = "$HOME/Library/Android/jdk"
     $env:ANDROID_HOME = "$HOME/Library/Android/sdk"
     $env:PATH = "$env:PATH:$env:ANDROID_HOME/platform-tools:$env:ANDROID_HOME/emulator"
