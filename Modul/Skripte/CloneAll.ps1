@@ -34,13 +34,15 @@
     3.4.0    2026-11-05  Hubi/Claude   Ohne Dev-Ordner: Skript liegt direkt in Repos (~/Repos), DEV_HOME entfällt
     3.5.0    2026-11-06  Hubi/Claude   Mds geändert (neu geklont oder neue Commits) -> sofort Mds/Install.ps1;
                                        Status 'Aktuell', wenn der pull nichts geholt hat
+    3.6.0    2026-11-10  Claude/Hubi   Am Ende Set-RepoColors.ps1: VS-Code-Farben je Repo-Typ
+                                       (C# lila, Python gold, PowerShell blau)
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.5.0'
+$ScriptVersion = '3.6.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -166,4 +168,18 @@ if ($mdsGeaendert) {
     else {
         & $install
     }
+}
+
+# --- VS-Code-Farben je Repo-Typ setzen (Set-RepoColors.ps1 liegt neben diesem Skript) ---
+# 2026-11-10 Claude/Hubi: erstellt
+$colorScript = Join-Path $PSScriptRoot 'Set-RepoColors.ps1'
+if (-not (Test-Path -LiteralPath $colorScript -PathType Leaf)) {
+    Write-Warning "$colorScript nicht gefunden - VS-Code-Farben nicht gesetzt."
+}
+elseif ($PSVersionTable.PSVersion.Major -lt 7) {
+    Write-Warning "Set-RepoColors.ps1 braucht PowerShell 7 - bitte in pwsh ausführen: $colorScript"
+}
+else {
+    Write-Host "`nVS-Code-Farben je Repo-Typ:" -ForegroundColor Cyan
+    & $colorScript -Root $ReposDir
 }
