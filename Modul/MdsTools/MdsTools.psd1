@@ -15,12 +15,13 @@
 #   2026-11-05  Hubi/Claude  8.3.3: push, clone (Invoke-PushAll/-CloneAll), Show-Alias
 #   2026-11-06  Hubi/Claude  8.3.4: go dev/go home = go repos; CloneAll: Mds geaendert -> Install.ps1
 #   2026-11-08  Hubi/Claude  8.3.5: go home -> ~
+#   2026-11-11  Hubi/Claude  8.3.6: Update-PowerShell bleibt in der Linie 7.6 (-Last, -Version)
 #
 @{
     RootModule        = 'MdsTools.psm1'
 
     # Einzige Stelle fuer die Modulversion (A2); $mdsVersion liest sie aus.
-    ModuleVersion     = '8.3.5'
+    ModuleVersion     = '8.3.6'
 
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'

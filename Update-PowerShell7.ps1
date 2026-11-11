@@ -3,6 +3,11 @@
 # Beschreibung: Prueft bzw. installiert PowerShell 7 aus dem offiziellen
 #               GitHub-Release (win-x64-MSI), winget-frei. Nur Windows.
 #
+#               "Neueste" heisst immer: neueste Version der Linie -Linie (Standard 7.6,
+#               LTS auf .NET 10). Auf 7.7 erst zusammen mit .NET 11 umstellen, ebenso
+#               $PwshLinie in Modul/MdsTools/SkriptModule/Tools.ps1. Ab 7.7 gibt es
+#               kein MSI mehr, nur noch MSIX/ZIP - dieses Skript muss dann angepasst werden.
+#
 #               Ablauf:
 #                 - keine PowerShell 7 vorhanden  -> Warnung, neueste Version installieren
 #                 - PowerShell 7 vorhanden        -> installierte Version anzeigen und ob
@@ -29,10 +34,11 @@
 #   Adminrechte per UAC; Argumente werden durchgereicht). Direkt in Windows
 #   PowerShell 5.1 "Als Administrator":
 #   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Update-PowerShell7.ps1
-#     -Last           neueste Version installieren, auch wenn schon eine vorhanden ist
+#     -Last           neueste Version der Linie installieren, auch wenn schon eine vorhanden ist
 #     -Version 7.6.4  diese Version installieren (statt der neuesten)
 #     -Force          laufende pwsh.exe-Prozesse vor der Installation beenden
 #     -KeepMsi        heruntergeladene MSI behalten
+#     -Linie 7.6      Versionslinie fuer "neueste" (Standard 7.6)
 #
 # Exit-Codes: 0 = OK, 1 = Fehler, 2 = falscher Host/keine Adminrechte,
 #             3010 = installiert, aber Neustart erforderlich
@@ -44,6 +50,8 @@
 #                            nur noch laufende pwsh.exe; Warnung ohne Adminrechte
 #   2026-11-04  Hubi/Claude  2.1.0: umbenannt von Install-PowerShell7.ps1 (Tab-Vervollstaendigung
 #                            bei ./Inst...); Update-PowerShell im Modul verweist unter Windows hierher
+#   2026-11-11  Hubi/Claude  2.2.0: -Linie (Standard 7.6): -Last und die Anzeige bleiben in der Linie;
+#                            Hinweis, wenn die installierte Version neuer als die Linie ist
 #
 # PowerShell: 5.1 (Desktop)
 #======================================================================
@@ -60,8 +68,11 @@ param(
     [Parameter(HelpMessage = "Diese Version installieren statt der neuesten, z. B. '7.6.4'")]
     [string] $Version,
 
-    [Parameter(HelpMessage = "Neueste Version installieren, auch wenn PowerShell 7 schon vorhanden ist")]
+    [Parameter(HelpMessage = "Neueste Version der Linie installieren, auch wenn PowerShell 7 schon vorhanden ist")]
     [switch] $Last,
+
+    [Parameter(HelpMessage = "Versionslinie Major.Minor fuer 'neueste', z. B. '7.6'")]
+    [string] $Linie = '7.6',
 
     [Parameter(HelpMessage = "Laufende pwsh.exe-Prozesse vor der Installation beenden")]
     [switch] $Force,
@@ -188,21 +199,30 @@ if (-not $vorhanden) {
 [Net.ServicePointManager]::SecurityProtocol =
     [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-$uri = if ([string]::IsNullOrWhiteSpace($Version)) {
-    "https://api.github.com/repos/$Repository/releases/latest"
-}
-else {
-    "https://api.github.com/repos/$Repository/releases/tags/v$($Version -replace '^v')"
-}
+$basis = "https://api.github.com/repos/$Repository/releases"
+$kopf = @{ 'User-Agent' = 'MdsTools' }
 
 Write-Host "Frage GitHub-Release ab ..." -ForegroundColor Yellow
 try {
-    $release = Invoke-RestMethod -Uri $uri -Headers @{ 'User-Agent' = 'MdsTools' } -TimeoutSec 30
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        # Neueste stabile Version der Linie, z. B. hoechstes v7.6.x. Erst in eine Variable:
+        # unter 5.1 gibt Invoke-RestMethod ein JSON-Array als EIN Objekt in die Pipeline.
+        $muster = '^v' + [regex]::Escape($Linie) + '\.[0-9]+$'
+        $liste = Invoke-RestMethod -Uri "$($basis)?per_page=100" -Headers $kopf -TimeoutSec 30
+        $release = $liste |
+            Where-Object { -not $_.prerelease -and -not $_.draft -and $_.tag_name -match $muster } |
+            Sort-Object { ConvertTo-Version $_.tag_name } -Descending |
+            Select-Object -First 1
+        if (-not $release) { throw "Kein Release der Linie $Linie gefunden." }
+    }
+    else {
+        $release = Invoke-RestMethod -Uri "$basis/tags/v$($Version -replace '^v')" -Headers $kopf -TimeoutSec 30
+    }
 }
 catch {
     if (-not [string]::IsNullOrWhiteSpace($Version) -and "$_" -match '"status"\s*:\s*"404"') {
         Write-Host "Version '$Version' gibt es nicht als Release (Tag v$($Version -replace '^v') nicht gefunden)." -ForegroundColor Red
-        Write-Host "Ohne -Version wird die neueste Version installiert." -ForegroundColor Yellow
+        Write-Host "Ohne -Version wird die neueste Version der Linie $Linie installiert." -ForegroundColor Yellow
     }
     else {
         Write-Host "GitHub-Release konnte nicht ermittelt werden: $_" -ForegroundColor Red
@@ -221,8 +241,12 @@ $zielVersion = ConvertTo-Version $release.tag_name
 
 # --- 5. Vorhandene PowerShell 7 ohne -Last/-Version: nur Version und neuere anzeigen ---
 if ($vorhanden -and -not $wunsch) {
-    Write-Host "  Neueste:     $zielVersion"
-    if ($zielVersion -gt $dateiVersion) {
+    Write-Host "  Neueste:     $zielVersion (Linie $Linie)"
+    if ($dateiVersion -gt $zielVersion -and "$($dateiVersion.Major).$($dateiVersion.Minor)" -ne $Linie) {
+        Write-Host "Installiert ist $dateiVersion, also neuer als die Linie $Linie." -ForegroundColor Yellow
+        Write-Host "Zurueck mit: Update-PowerShell7.cmd -Version $zielVersion (ggf. vorher deinstallieren)" -ForegroundColor Yellow
+    }
+    elseif ($zielVersion -gt $dateiVersion) {
         Write-Host "Neuere Version verfuegbar: $zielVersion (installiert: $dateiVersion)." -ForegroundColor Yellow
         Write-Host "Installieren mit: Update-PowerShell7.cmd -Last" -ForegroundColor Yellow
     }

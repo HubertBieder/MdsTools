@@ -44,6 +44,7 @@
 | 2026-11-06 | 0.38    | Hubert Bieder/Claude | 8.3.4: `go dev`, `go home` (wie `go repos`)                                              |
 | 2026-11-06 | 0.39    | Hubert Bieder/Claude | CloneAll: Mds geändert → sofort `Mds/Install.ps1`                                         |
 | 2026-11-08 | 0.40    | Hubert Bieder/Claude | 8.3.5: `go home` nach `~`                                                                 |
+| 2026-11-11 | 0.41    | Hubert Bieder/Claude | 8.3.6: PowerShell-Linie 7.6 (`Update-PowerShell -Last`/`-Version`, `Update-PowerShell7.ps1 -Linie`) |
 
 ---
 
@@ -80,7 +81,7 @@ Repo-Konventionen – steht in [MDS-Development.md](MDS-Development.md) und wird
 
 | Nr. | Anforderung                                                                                                                                                 |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | Nur PowerShell 7, mindestens **7.6** (`PowerShellVersion = '7.6'` im Manifest, `#Requires -Version 7.6`).                                                   |
+| A1  | Nur PowerShell 7, mindestens **7.6** (`PowerShellVersion = '7.6'` im Manifest, `#Requires -Version 7.6`). Installiert wird die LTS-Linie 7.6 (.NET 10, `$PwshLinie` in `Tools.ps1`); 7.7 erst mit .NET 11. |
 | A2  | Die Modulversion wird **zentral** im Manifest `MdsTools.psd1` festgelegt; `$mdsVersion` liest sie aus.                                                      |
 | A3  | `Install.ps1` in der Repo-Root installiert das Modul, das Profil und die globalen Skripte.                                                                  |
 | A4  | `Uninstall.ps1` in der Repo-Root entfernt die Installation von MdsTools aus allen Benutzer-Modulpfaden.                                                     |
@@ -109,7 +110,7 @@ wie `Resolve-MdsPath` müssen nicht exportiert werden.
    Install.ps1                 # Installation von Modul, Profil und globalen Skripten
    Uninstall.ps1               # entfernt die Installation
    InstallHelper.ps1           # gemeinsame Pfad-Helfer für Install.ps1 und Uninstall.ps1
-   Update-PowerShell7.ps1      # nur Windows, läuft unter 5.1: PowerShell 7 prüfen/installieren (-Last, -Version)
+   Update-PowerShell7.ps1      # nur Windows, läuft unter 5.1: PowerShell 7.6.x prüfen/installieren (-Last, -Version)
    Update-PowerShell7.cmd      # Starter: 5.1 als Administrator, Argumente werden durchgereicht
    Modul/
       MdsTools/

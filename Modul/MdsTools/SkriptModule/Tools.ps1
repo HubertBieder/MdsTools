@@ -12,9 +12,16 @@
 #   2026-11-04  Hubi/Claude  Update-PowerShell: unter Windows nur Anzeige, Installation ueber
 #                            Update-PowerShell7.cmd (Windows PowerShell 5.1); Install-PowerShell7FromGithub entfaellt
 #   2026-11-05  Hubi/Claude  Show-Mds: Zeile mdsDev entfaellt (8.3)
+#   2026-11-11  Hubi/Claude  Update-PowerShell: Versionslinie 7.6 ($PwshLinie), -Version (auch Downgrade),
+#                            macOS immer PKG von GitHub, ohne -Last Hinweis auf neuere Version (8.3.6)
 #
 # Oeffentlich: Update-DotNet, Update-PowerShell, Show-PowerShell, Show-Mds
 #======================================================================
+
+# PowerShell-Versionslinie fuer Update-PowerShell: -Last und die Anzeige bleiben innerhalb dieser
+# Linie (7.6 = LTS auf .NET 10). Auf 7.7 erst zusammen mit dem Wechsel auf .NET 11 umstellen,
+# ebenso den Standardwert von -Linie in Update-PowerShell7.ps1.
+$script:PwshLinie = '7.6'
 
 # [intern] Ermittelt die hoechste im winget-Repository verfuegbare Version eines Pakets.
 #   PackageId  winget-Paket-ID
@@ -85,15 +92,37 @@ function Get-InstalledPwshVersion {
     catch { return [version]"0.0.0" }
 }
 
-# [intern] Laedt ein Asset des neuesten GitHub-Releases (Muster mit Platzhaltern) ins
-# Temp-Verzeichnis. Rueckgabewert: Pfad der Datei oder $null.
-function Save-GithubReleaseAsset([string] $Repository, [string] $Pattern) {
+# [intern] Sucht ein PowerShell-Release auf GitHub: mit Version genau dieses (Tag v<Version>),
+# sonst das neueste stabile Release der Linie (z. B. '7.6' -> hoechstes v7.6.x).
+#   Linie    Major.Minor, z. B. '7.6'
+#   Version  genaue Version, z. B. '7.6.10' (hat Vorrang vor Linie)
+# Rueckgabewert: Release-Objekt der GitHub-API oder $null.
+function Get-PwshRelease([string] $Linie, [string] $Version) {
+    $kopf = @{ 'User-Agent' = 'MdsTools' }
+    $basis = 'https://api.github.com/repos/PowerShell/PowerShell/releases'
     try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" `
-            -Headers @{ 'User-Agent' = 'MdsTools' } -TimeoutSec 30
-        $asset = $release.assets | Where-Object name -like $Pattern | Select-Object -First 1
+        if ($Version) {
+            return Invoke-RestMethod -Uri "$basis/tags/v$($Version -replace '^v')" -Headers $kopf -TimeoutSec 30
+        }
+        $muster = '^v' + [regex]::Escape($Linie) + '\.[0-9]+$'
+        $liste = Invoke-RestMethod -Uri "$($basis)?per_page=100" -Headers $kopf -TimeoutSec 30
+        return $liste |
+            Where-Object { -not $_.prerelease -and -not $_.draft -and $_.tag_name -match $muster } |
+            Sort-Object { [version]($_.tag_name -replace '^v') } -Descending |
+            Select-Object -First 1
+    }
+    catch { return $null }
+}
+
+# [intern] Laedt ein Asset eines GitHub-Releases (Muster mit Platzhaltern) ins
+# Temp-Verzeichnis. Rueckgabewert: Pfad der Datei oder $null.
+#   Release  Release-Objekt der GitHub-API (z. B. aus Get-PwshRelease)
+#   Pattern  Dateiname mit Platzhaltern, z. B. '*osx-arm64.pkg'
+function Save-GithubReleaseAsset($Release, [string] $Pattern) {
+    try {
+        $asset = $Release.assets | Where-Object name -like $Pattern | Select-Object -First 1
         if (-not $asset) {
-            Write-Error "Kein Download für Muster '$Pattern' im neuesten Release von $Repository gefunden."
+            Write-Error "Kein Download für Muster '$Pattern' im Release $($Release.tag_name) gefunden."
             return $null
         }
         $datei = Join-Path ([System.IO.Path]::GetTempPath()) $asset.name
@@ -268,96 +297,131 @@ function Update-DotNet {
 }
 
 # [public] Update-PowerShell — Prueft die installierte PowerShell-7-Version und aktualisiert
-# sie im laufenden Betrieb, falls sie unter der Zielversion liegt. Mit -Last ist das Ziel die
-# neueste GitHub-Release-Version.
-#   macOS:   Homebrew (cask powershell), falls darueber installiert, sonst PKG von GitHub
-#            per 'sudo installer' (fragt nach dem Passwort).
-#   Windows: nur Anzeige (installierte und neueste Version). Installiert wird mit
-#            Update-PowerShell7.cmd im Repo Mds: Es laeuft in Windows PowerShell 5.1, denn ein
-#            MSI-Update aus der laufenden pwsh beendet diese pwsh mitten in der Installation.
+# sie im laufenden Betrieb. Alle Versionsangaben bleiben in der Linie $PwshLinie (7.6):
+#   ohne Parameter  installiert nur, wenn die Version unter MinVersion liegt; sonst Anzeige,
+#                   ob es eine neuere Version der Linie gibt
+#   -Last           neueste Version der Linie installieren
+#   -Version 7.6.10 genau diese Version installieren (auch Downgrade, z. B. von 7.7 zurueck)
+#   macOS:   PKG von GitHub per 'sudo installer' (fragt nach dem Passwort). Nicht ueber
+#            Homebrew: 'brew upgrade' nimmt immer die neueste Version, auch ausserhalb der Linie.
+#   Windows: nur Anzeige. Installiert wird mit Update-PowerShell7.cmd im Repo Mds: Es laeuft in
+#            Windows PowerShell 5.1, denn ein MSI-Update aus der laufenden pwsh beendet diese
+#            pwsh mitten in der Installation.
 #   MinVersion  Mindest-Zielversion
-#   Last        Auf die neueste GitHub-Release-Version aktualisieren
+#   Last        Auf die neueste Version der Linie aktualisieren
+#   Version     Genau diese Version installieren
+#   Linie       Versionslinie Major.Minor (Standard $PwshLinie)
 # Rueckgabewert: $true wenn aktuell genug (oder Update erfolgreich), sonst $false.
-# 2026-10-31 Hubi/Claude: macOS-Zweig aus UpdatePS.ps1 uebernommen (E9), UpdatePS.ps1 entfaellt
-# 2026-11-04 Hubi/Claude: Windows nur Anzeige, Verweis auf Update-PowerShell7.cmd; ohne -PackageId
 function Update-PowerShell {
     [CmdletBinding()]
     param(
         [Parameter(Position = 0, HelpMessage = "Mindest-Zielversion")]
         [version] $MinVersion = [version]"7.6.2",
 
-        [Parameter(HelpMessage = "Auf die neueste GitHub-Release-Version aktualisieren")]
-        [switch] $Last
+        [Parameter(HelpMessage = "Auf die neueste Version der Linie aktualisieren")]
+        [switch] $Last,
+
+        [Parameter(HelpMessage = "Genau diese Version installieren, z. B. 7.6.10 (auch Downgrade)")]
+        [string] $Version,
+
+        [Parameter(HelpMessage = "Versionslinie Major.Minor, z. B. 7.6")]
+        [string] $Linie = $script:PwshLinie
     )
 
     $aktuell = Get-InstalledPwshVersion
+    $release = Get-PwshRelease -Linie $Linie -Version $Version
+    $neueste = if ($release) { [version]($release.tag_name -replace '^v' -replace '-.*$') } else { [version]'0.0.0' }
+
+    if ($Version -and -not $release) {
+        Write-Error "PowerShell $Version gibt es nicht als Release auf GitHub (Tag v$($Version -replace '^v'))."
+        return $false
+    }
+
+    # Installiert, aber neuer als die Linie (z. B. 7.7 statt 7.6)?
+    $ueberLinie = ($neueste -gt [version]'0.0.0' -and $aktuell -gt $neueste -and
+                   "$($aktuell.Major).$($aktuell.Minor)" -ne $Linie)
+
+    Write-Host "PowerShell 7 installiert: $aktuell" -ForegroundColor Cyan
+    if ($neueste -gt [version]'0.0.0') {
+        if ($Version) { Write-Host "Gewünschte Version:       $neueste" }
+        else { Write-Host "Neueste $Linie.x:           $neueste" }
+    }
 
     # Windows: nur anzeigen, installiert wird aus Windows PowerShell 5.1 (Update-PowerShell7.cmd)
     if ($IsWindows) {
-        $neueste = Get-GithubLatestVersion -Repository 'PowerShell/PowerShell'
-        $ziel = if ($Last -and $neueste -gt $MinVersion) { $neueste } else { $MinVersion }
-        Write-Host "PowerShell 7 installiert: $aktuell" -ForegroundColor Cyan
-        if ($neueste -gt [version]'0.0.0') { Write-Host "Neueste Version:          $neueste" }
         $starter = Join-Path (Join-Path $mdsRepos 'Mds') 'Update-PowerShell7.cmd'
-        if ($neueste -gt $aktuell -or $aktuell -lt $ziel) {
+        if ($Version -and $aktuell -ne $neueste) {
+            Write-Host "Installieren aus Windows PowerShell 5.1 (nicht aus pwsh):" -ForegroundColor Yellow
+            Write-Host "  $starter -Version $Version" -ForegroundColor Yellow
+        }
+        elseif ($ueberLinie) {
+            Write-Host "Installiert ist $aktuell, also neuer als die Linie $Linie. Zurück aus Windows PowerShell 5.1:" -ForegroundColor Yellow
+            Write-Host "  $starter -Version $neueste" -ForegroundColor Yellow
+        }
+        elseif ($neueste -gt $aktuell) {
             Write-Host "Aktualisieren aus Windows PowerShell 5.1 (nicht aus pwsh):" -ForegroundColor Yellow
             Write-Host "  $starter -Last" -ForegroundColor Yellow
         }
         else {
             Write-Host "PowerShell 7 ist aktuell." -ForegroundColor Green
         }
-        return ($aktuell -ge $ziel)
+        return ($aktuell -ge $MinVersion)
     }
 
-    # Bei -Last die neueste GitHub-Version als Ziel verwenden
-    if ($Last) {
-        $githubNeueste = Get-GithubLatestVersion -Repository 'PowerShell/PowerShell'
-        if ($githubNeueste -gt $MinVersion) { $MinVersion = $githubNeueste }
-    }
+    # Zielversion: -Version genau, -Last neueste der Linie, sonst MinVersion als Untergrenze
+    $ziel = if ($Version) { $neueste }
+            elseif ($Last -and $neueste -gt $MinVersion) { $neueste }
+            else { $MinVersion }
 
-    if ($aktuell -ge $MinVersion) {
-        Write-Host "PowerShell 7 ist aktuell ($aktuell)" -ForegroundColor Green
+    if ($Version -and $aktuell -eq $ziel) {
+        Write-Host "PowerShell $aktuell ist bereits installiert." -ForegroundColor Green
+        return $true
+    }
+    if (-not $Version -and $aktuell -ge $ziel) {
+        if ($ueberLinie) {
+            Write-Host "Installiert ist $aktuell, also neuer als die Linie $Linie. Zurück mit:" -ForegroundColor Yellow
+            Write-Host "  Update-PowerShell -Version $neueste" -ForegroundColor Yellow
+        }
+        elseif ($neueste -gt $aktuell) {
+            Write-Host "Neuere Version verfügbar: $neueste. Installieren mit: Update-PowerShell -Last" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "PowerShell 7 ist aktuell ($aktuell)" -ForegroundColor Green
+        }
         return $true
     }
 
-    Write-Host "Update nötig ($aktuell -> $MinVersion) ..." -ForegroundColor Yellow
-
-    if ($IsMacOS) {
-        $brewCask = $false
-        if (Get-Command brew -ErrorAction SilentlyContinue) {
-            & brew list --cask powershell *> $null
-            $brewCask = ($LASTEXITCODE -eq 0)
-        }
-        if ($brewCask) {
-            & brew update
-            & brew upgrade --cask powershell
-        }
-        else {
-            $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
-            $pkg = Save-GithubReleaseAsset -Repository 'PowerShell/PowerShell' -Pattern "*osx-$arch.pkg"
-            if (-not $pkg) { return $false }
-            Write-Host 'Installation benötigt Admin-Rechte (sudo) ...'
-            & sudo installer -pkg $pkg -target /
-            Remove-Item -LiteralPath $pkg -ErrorAction SilentlyContinue
-        }
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "Update meldete Exit-Code $LASTEXITCODE."
-            return $false
-        }
-    }
-    else {
+    if (-not $IsMacOS) {
         Write-Error "Update-PowerShell unterstützt nur Windows und macOS."
+        return $false
+    }
+    if (-not $release) {
+        Write-Error "PowerShell-Release der Linie $Linie konnte auf GitHub nicht ermittelt werden."
+        return $false
+    }
+
+    $ziel = $neueste
+    Write-Host "Installiere PowerShell $ziel ($aktuell -> $ziel) ..." -ForegroundColor Yellow
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+    $pkg = Save-GithubReleaseAsset -Release $release -Pattern "powershell-$ziel-osx-$arch.pkg"   # nicht powershell-lts-* (pwsh-lts)
+    if (-not $pkg) { return $false }
+    Write-Host 'Installation benötigt Admin-Rechte (sudo) ...'
+    & sudo installer -pkg $pkg -target /
+    $code = $LASTEXITCODE
+    Remove-Item -LiteralPath $pkg -ErrorAction SilentlyContinue
+    if ($code -ne 0) {
+        Write-Error "installer meldete Exit-Code $code."
         return $false
     }
 
     # Nach dem Update erneut pruefen
     $neu = Get-InstalledPwshVersion
-    if ($neu -ge $MinVersion) {
-        Write-Host "PowerShell 7 aktualisiert ($aktuell -> $neu). Bitte offene pwsh-Fenster neu starten." -ForegroundColor Green
+    if ($neu -eq $ziel) {
+        Write-Host "PowerShell 7 installiert ($aktuell -> $neu). Bitte offene pwsh-Fenster neu starten." -ForegroundColor Green
         return $true
     }
 
-    Write-Error "Update durchgeführt, aber Version weiterhin zu niedrig ($neu)."
+    Write-Error "Installation durchgeführt, aber Version ist $neu statt $ziel."
     return $false
 }
 

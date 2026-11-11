@@ -33,13 +33,15 @@ denselben Befehlen:
 
 ## Schnellstart
 
-Voraussetzung: PowerShell 7.6 oder neuer. Unter Windows prüft bzw. installiert `Update-PowerShell7.cmd`
-(Doppelklick, läuft in Windows PowerShell 5.1 als Administrator) die PowerShell 7:
+Voraussetzung: PowerShell 7.6. Wir bleiben auf der LTS-Linie **7.6** (.NET 10); auf 7.7 erst zusammen mit
+.NET 11. „Neueste“ heißt deshalb immer: neueste 7.6.x. Unter Windows prüft bzw. installiert
+`Update-PowerShell7.cmd` (Doppelklick, läuft in Windows PowerShell 5.1 als Administrator) die PowerShell 7,
+unter macOS `Update-PowerShell` (`-Last`, `-Version 7.6.10`):
 
 | Aufruf                                   | Wirkung                                                                 |
 | ---------------------------------------- | ----------------------------------------------------------------------- |
 | `Update-PowerShell7.cmd`                 | keine PowerShell 7: Warnung, neueste installieren; sonst Version und ob es eine neuere gibt |
-| `Update-PowerShell7.cmd -Last`           | in jedem Fall die neueste Version installieren                          |
+| `Update-PowerShell7.cmd -Last`           | in jedem Fall die neueste 7.6.x installieren                            |
 | `Update-PowerShell7.cmd -Version 7.6.4`  | diese Version installieren                                              |
 
 Ohne Administratorrechte bricht `Update-PowerShell7.ps1` nach einer Warnung ab.
