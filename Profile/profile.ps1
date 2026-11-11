@@ -83,9 +83,15 @@ if ($IsMacOS) {
         if ($args -contains '-c') { & /sbin/ping @args } else { & /sbin/ping -c 4 @args }
     }
 
+    # Android-/iOS-Entwicklung (nur macOS): JDK + SDK aus InstallAndroidDependencies.
+    # ${env:PATH} mit Klammern — "$env:PATH:..." liest PowerShell als Variable "PATH:" (leer)
+    # und löscht damit /usr/bin, /bin, … aus PATH (xcrun fehlt → Mac-Catalyst-Build scheitert).
     $env:JAVA_HOME = "$HOME/Library/Android/jdk"
     $env:ANDROID_HOME = "$HOME/Library/Android/sdk"
-    $env:PATH = "$env:PATH:$env:ANDROID_HOME/platform-tools:$env:ANDROID_HOME/emulator"
+    foreach ($dir in "${env:ANDROID_HOME}/platform-tools", "${env:ANDROID_HOME}/emulator") {
+        if (($env:PATH -split ':') -notcontains $dir) { $env:PATH = "${env:PATH}:$dir" }
+    }
+    Remove-Variable dir
 }
 if ($IsWindows) {
     function androidbuild { dotnet build src/Apps/DataBrowser/DataBrowser.csproj --framework net10.0-android --configuration Debug -t:Run -p:AdbTarget=-d }
