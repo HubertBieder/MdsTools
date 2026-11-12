@@ -6,7 +6,7 @@
 #               Speicherdatei: $mdsConfig/Desktop/<rechner>.json (luna.json, mars.json).
 #
 # Versionshistorie:
-#   2026-11-12  Hubi/Claude  Erstellt (8.4.0): Desktop-Symbole statt offener Fenster
+#   2026-11-12  Hubi/Claude  Erstellt (8.4.0)
 #
 # Oeffentlich: Save-Desktop, Restore-Desktop
 #======================================================================
@@ -500,7 +500,7 @@ function Restore-Desktop {
     }
     $daten = Get-Content -LiteralPath $datei -Raw | ConvertFrom-Json
     if (-not $daten.PSObject.Properties['Icons']) {
-        Write-Error "$datei enthaelt keine Desktop-Symbole (alte Fenster-Datei?). Bitte neu mit Save-Desktop speichern."
+        Write-Error "$datei enthaelt keine Desktop-Symbole. Bitte neu mit Save-Desktop speichern."
         return
     }
     $state = Get-DesktopState
