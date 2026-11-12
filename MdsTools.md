@@ -45,6 +45,7 @@
 | 2026-11-06 | 0.39    | Hubert Bieder/Claude | CloneAll: Mds geändert → sofort `Mds/Install.ps1`                                         |
 | 2026-11-08 | 0.40    | Hubert Bieder/Claude | 8.3.5: `go home` nach `~`                                                                 |
 | 2026-11-11 | 0.41    | Hubert Bieder/Claude | 8.3.6: PowerShell-Linie 7.6 (`Update-PowerShell -Last`/`-Version`, `Update-PowerShell7.ps1 -Linie`) |
+| 2026-11-12 | 0.42    | Hubert Bieder/Claude | 8.4.0: `Save-Desktop`/`Restore-Desktop` für Desktop-Symbole, Datei je Rechner (`luna.json`, `mars.json`) |
 
 ---
 
@@ -127,6 +128,7 @@ wie `Resolve-MdsPath` müssen nicht exportiert werden.
             Zip.ps1            # ZIP-Funktionen
             Tools.ps1          # Update-/Show-PowerShell, Update-DotNet, Show-Mds
             Navigation.ps1     # go, mk, run
+            Desktop.ps1        # Save-Desktop, Restore-Desktop (Windows und macOS)
          MdsSkripte/           # *.ps1 – woy/Auftrag, nur Windows
             InitMDS.ps1        # lädt alle MdsSkripte
             WoyEnv.ps1         # Get-WoyValue, Get-WoyCredential (woy.env)
@@ -470,6 +472,7 @@ Funktionen des Moduls, nach Datei.
 | `Resolve-MdsPath`                                                | `Common.ps1`     | nein   | interner Pfad-Helfer                                                                   |
 | `Get-ProjectReference`, `Get-ExportedMember`                     | `Common.ps1`     | nein   | nur intern genutzt                                                                     |
 | `Backup-Develop`, `Get-OneDriveRoot`                             | `FileIO.ps1`     | ja     | OneDrive unter Windows und macOS (`~/Library/CloudStorage`)                            |
+| `Save-Desktop`, `Restore-Desktop`                                | `Desktop.ps1`    | ja     | Desktop-Symbole je Rechner, Windows und macOS, siehe unten                             |
 
 ### Copy-FileWithCredential / Copy-FolderWithCredential
 
@@ -483,6 +486,29 @@ Kopieren eine Datei bzw. einen Ordner auf eine SMB-Freigabe, unter Windows und m
 
 Die Verbindung wird nach dem Kopieren immer getrennt, auch im Fehlerfall (`finally`). Unter Windows übergibt
 `MdsSkripte` die woy-Anmeldedaten.
+
+### Save-Desktop / Restore-Desktop
+
+Speichern und Wiederherstellen der Positionen der **Desktop-Symbole** (Verknüpfungen, Dateien, Ordner,
+Papierkorb …) je Bildschirm, z. B. *Home Assistant* auf dem zweiten Bildschirm oben links, daneben *ShowTüre.exe*.
+Offene Fenster werden nicht gespeichert.
+
+```powershell
+Save-Desktop                    # -> $mdsConfig/Desktop/<rechner>.json, z. B. luna.json, mars.json
+Save-Desktop vortrag            # weitere Anordnung -> vortrag.json
+Restore-Desktop                 # Symbole an die gespeicherten Stellen setzen
+Restore-Desktop -WhatIf         # nur anzeigen, was verschoben würde
+```
+
+| Punkt         | Verhalten                                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| Datei         | Standard ist der Rechnername ohne Domain, klein; ein anderer Name oder ein Pfad `*.json` ist möglich        |
+| Inhalt        | je Symbol Name, Bildschirm, X, Y (Bildschirmkoordinaten) und Pfad; dazu die Bildschirme                     |
+| Zuordnung     | zuerst über den Pfad, dann über den Namen; fehlende Symbole werden gemeldet                                 |
+| Bildschirm    | gleicher Name und gleiche Lage: Position unverändert; sonst relativ zum Bildschirm, fehlt er: Hauptbildschirm |
+| Voraussetzung | *Automatisch anordnen* ist aus; *Am Raster ausrichten* darf an bleiben                                      |
+| Windows       | Shell-COM (`IFolderView` des Desktops), physische Pixel                                                    |
+| macOS         | Finder über `osascript`; beim ersten Aufruf Freigabe *Automation › Finder* bestätigen; Sortieren nach: Ohne |
 
 ## Auftragsabwicklung (nur Windows)
 

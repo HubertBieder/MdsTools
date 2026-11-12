@@ -16,12 +16,13 @@
 #   2026-11-06  Hubi/Claude  8.3.4: go dev/go home = go repos; CloneAll: Mds geaendert -> Install.ps1
 #   2026-11-08  Hubi/Claude  8.3.5: go home -> ~
 #   2026-11-11  Hubi/Claude  8.3.6: Update-PowerShell bleibt in der Linie 7.6 (-Last, -Version)
+#   2026-11-12  Hubi/Claude  8.4.0: Save-Desktop, Restore-Desktop: Desktop-Symbole je Bildschirm (Desktop.ps1)
 #
 @{
     RootModule        = 'MdsTools.psm1'
 
     # Einzige Stelle fuer die Modulversion (A2); $mdsVersion liest sie aus.
-    ModuleVersion     = '8.3.6'
+    ModuleVersion     = '8.4.0'
 
     GUID              = '2c35decb-09fa-485a-b287-a1f1f2774b39'
     Author            = 'Hubert Bieder'
@@ -44,7 +45,8 @@
         'Copy-ToZip', 'Copy-FileToZip', 'Export-FromZip', 'Get-ZipEntry',              # Zip.ps1
         'Update-DotNet', 'Update-PowerShell', 'Show-PowerShell', 'Show-Mds',           # Tools.ps1
         'go', 'mk', 'run', 'Show-Repos', 'Show-Alias',                                 # Navigation.ps1
-        'Invoke-PushAll', 'Invoke-CloneAll'                                            # Navigation.ps1
+        'Invoke-PushAll', 'Invoke-CloneAll',                                           # Navigation.ps1
+        'Save-Desktop', 'Restore-Desktop'                                              # Desktop.ps1
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

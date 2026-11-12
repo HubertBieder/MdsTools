@@ -26,6 +26,7 @@
     1.10.0   2026-11-05  Hubi/Claude   push, clone, Show-Alias
     1.11.0   2026-11-06  Hubi/Claude   go dev/go home
     1.12.0   2026-11-08  Hubi/Claude   go home -> ~
+    1.13.0   2026-11-12  Hubi/Claude   Save-Desktop/Restore-Desktop: Desktop-Symbole (Zuordnung, Bildschirme, Dateiname)
 #>
 
 BeforeAll {
@@ -689,3 +690,61 @@ Describe 'push, clone und Show-Alias' {
     }
 }
 
+
+Describe 'Save-Desktop und Restore-Desktop (ohne echten Desktop)' {
+    It 'Standarddatei ist der Rechnername klein in $mdsConfig/Desktop' {
+        InModuleScope MdsTools {
+            $name = ([Environment]::MachineName -split '\.')[0].ToLowerInvariant()
+            Get-DesktopDefaultName | Should -Be $name
+            Get-DesktopFile $name | Should -Be (Join-Path (Join-Path $mdsConfig 'Desktop') "$name.json")
+            Get-DesktopFile 'x/y.json' | Should -Be 'x/y.json'
+        }
+    }
+
+    It 'ordnet Symbole zuerst ueber den Pfad, dann ueber den Namen zu' {
+        InModuleScope MdsTools {
+            $saved = @(
+                [pscustomobject]@{ Name = 'Home Assistant'; Path = 'C:\D\Home Assistant.url' }
+                [pscustomobject]@{ Name = 'ShowTüre.exe'; Path = 'C:\D\alt\ShowTüre.exe' }
+                [pscustomobject]@{ Name = 'Weg'; Path = 'C:\D\Weg.lnk' }
+            )
+            $current = @(
+                [pscustomobject]@{ Name = 'ShowTüre.exe'; Path = 'C:\D\ShowTüre.exe'; Id = 1 }
+                [pscustomobject]@{ Name = 'Home Assistant'; Path = 'C:\D\Home Assistant.url'; Id = 2 }
+            )
+            $m = @(Find-DesktopMatch $saved $current)
+            $m.Count | Should -Be 3
+            $m[0].Current.Id | Should -Be 2
+            $m[1].Current.Id | Should -Be 1
+            $m[2].Current | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'bestimmt den Bildschirm ueber die Mitte' {
+        InModuleScope MdsTools {
+            $screens = @(
+                [pscustomobject]@{ Name = 'DISPLAY1'; Primary = $true; X = 0; Y = 0; Width = 1920; Height = 1080 }
+                [pscustomobject]@{ Name = 'DISPLAY2'; Primary = $false; X = 1920; Y = 0; Width = 2560; Height = 1440 }
+            )
+            (Get-DesktopScreenOf ([pscustomobject]@{ X = 1800; Y = 10; Width = 800; Height = 600 }) $screens).Name | Should -Be 'DISPLAY2'
+            (Get-DesktopScreenOf ([pscustomobject]@{ X = 100; Y = 10; Width = 800; Height = 600 }) $screens).Name | Should -Be 'DISPLAY1'
+            (Get-DesktopScreenOf ([pscustomobject]@{ X = 9000; Y = 10; Width = 100; Height = 100 }) $screens).Name | Should -Be 'DISPLAY2'
+        }
+    }
+
+    It 'laesst die Lage bei gleichem Bildschirm und verschiebt sonst auf den Hauptbildschirm' {
+        InModuleScope MdsTools {
+            $alt = @(
+                [pscustomobject]@{ Name = 'DISPLAY1'; Primary = $true; X = 0; Y = 0; Width = 1920; Height = 1080 }
+                [pscustomobject]@{ Name = 'DISPLAY2'; Primary = $false; X = 1920; Y = 0; Width = 2560; Height = 1440 }
+            )
+            $neu = @($alt[0])
+            $w = [pscustomobject]@{ Screen = 'DISPLAY1'; X = 100; Y = 50; Width = 800; Height = 600 }
+            $r = Resolve-DesktopRect $w $alt $neu
+            "$($r.X),$($r.Y),$($r.Width),$($r.Height)" | Should -Be '100,50,800,600'
+            $w2 = [pscustomobject]@{ Screen = 'DISPLAY2'; X = 3000; Y = 200; Width = 2400; Height = 900 }
+            $r = Resolve-DesktopRect $w2 $alt $neu
+            "$($r.X),$($r.Y),$($r.Width),$($r.Height)" | Should -Be '0,180,1920,900'
+        }
+    }
+}
