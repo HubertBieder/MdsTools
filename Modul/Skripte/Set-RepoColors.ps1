@@ -34,6 +34,15 @@
                                        alten Peacock-Farben stehen bleiben
     1.2.0    2026-11-10  Claude/Hubi   C# jetzt Gold (bisher Lila), Python jetzt Grün (bisher Gold)
     1.3.0    2026-11-10  Claude/Hubi   C# und PowerShell getauscht: C# Blau, PowerShell Gold
+    1.4.0    2026-11-13  Claude/Hubi   Python und PowerShell getauscht: Python Gold, PowerShell Grün;
+                                       C# Titel- und Statusleiste heller (#0A3170)
+    1.5.0    2026-11-13  Claude/Hubi   Deckkraft inaktiver Schrift pro Typ (Dim), C# heller (DD);
+                                       peacock.color wird entfernt, damit Peacock nicht überschreibt
+    1.6.0    2026-11-13  Claude/Hubi   C# wieder Blau #012456 (Activity Bar #023988), Schrift Weiß
+    1.7.0    2026-11-13  Claude/Hubi   C#: Titel-, Statuszeile und Activity Bar einheitlich #023988
+    1.8.0    2026-11-13  Claude/Hubi   PowerShell: alle drei Bereiche einheitlich #43A047, inaktive Schrift heller (DD)
+    1.9.0    2026-11-13  Claude/Hubi   Python: alle drei Bereiche einheitlich #D9A21B
+    1.10.0   2026-11-13  Claude/Hubi   Titelzeile unfokussierter Fenster in voller Farbe (ohne Transparenz)
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -48,11 +57,12 @@ if (-not $Root) {
 }
 
 # --- Farbschemata pro Typ (hier anpassen) ---------------------------------
-#     Bg = Grundfarbe, Hi = hellere Variante (Activity Bar, Hover), Fg = Schrift, Badge/BadgeFg = Akzent
+#     Bg = Grundfarbe, Hi = hellere Variante (Activity Bar, Hover), Fg = Schrift, Badge/BadgeFg = Akzent,
+#     Dim = Deckkraft (Hex-Alpha) inaktiver Schrift: nicht aktive Icons links, Titel unfokussierter Fenster
 $Schemes = @{
-    'CSharp'     = @{ Bg = '#012456'; Hi = '#0A3C82'; Fg = '#FFFFFF'; Badge = '#4FC3F7'; BadgeFg = '#15202B'; Label = 'C#' }  # Blau
-    'Python'     = @{ Bg = '#2E7D32'; Hi = '#43A047'; Fg = '#FFFFFF'; Badge = '#FFD43B'; BadgeFg = '#15202B'; Label = 'Py' }  # Grün
-    'PowerShell' = @{ Bg = '#B8860B'; Hi = '#D9A21B'; Fg = '#15202B'; Badge = '#5C2D91'; BadgeFg = '#FFFFFF'; Label = 'PS' }  # Gold
+    'CSharp'     = @{ Bg = '#023988'; Hi = '#023988'; Fg = '#FFFFFF'; Badge = '#4FC3F7'; BadgeFg = '#15202B'; Dim = 'DD'; Label = 'C#' }  # Blau
+    'Python'     = @{ Bg = '#D9A21B'; Hi = '#D9A21B'; Fg = '#15202B'; Badge = '#5C2D91'; BadgeFg = '#FFFFFF'; Dim = '99'; Label = 'Py' }  # Gold
+    'PowerShell' = @{ Bg = '#43A047'; Hi = '#43A047'; Fg = '#FFFFFF'; Badge = '#FFD43B'; BadgeFg = '#15202B'; Dim = 'DD'; Label = 'PS' }  # Grün
 }
 
 function Get-RepoType {
@@ -77,15 +87,15 @@ function Get-ColorBlock {
         'activityBar.activeBorder'            = $S.Fg
         'activityBar.background'              = $S.Hi
         'activityBar.foreground'              = $S.Fg
-        'activityBar.inactiveForeground'      = $S.Fg + '99'
+        'activityBar.inactiveForeground'      = $S.Fg + $S.Dim
         'activityBarBadge.background'         = $S.Badge
         'activityBarBadge.foreground'         = $S.BadgeFg
         'activityBarTop.activeBackground'     = $S.Hi
         'activityBarTop.activeBorder'         = $S.Fg
         'activityBarTop.background'           = $S.Hi
         'activityBarTop.foreground'           = $S.Fg
-        'activityBarTop.inactiveForeground'   = $S.Fg + '99'
-        'commandCenter.border'                = $S.Fg + '99'
+        'activityBarTop.inactiveForeground'   = $S.Fg + $S.Dim
+        'commandCenter.border'                = $S.Fg + $S.Dim
         'commandCenter.foreground'            = $S.Fg
         'sash.hoverBorder'                    = $S.Hi
         'statusBar.background'                = $S.Bg
@@ -98,8 +108,8 @@ function Get-ColorBlock {
         'statusBarItem.remoteForeground'      = $S.Fg
         'titleBar.activeBackground'           = $S.Bg
         'titleBar.activeForeground'           = $S.Fg
-        'titleBar.inactiveBackground'         = $S.Bg + '99'
-        'titleBar.inactiveForeground'         = $S.Fg + '99'
+        'titleBar.inactiveBackground'         = $S.Bg
+        'titleBar.inactiveForeground'         = $S.Fg + $S.Dim
     }
 }
 
@@ -134,7 +144,7 @@ foreach ($repo in $repos) {
     $colors = if ($json.Contains('workbench.colorCustomizations')) { $json['workbench.colorCustomizations'] } else { [ordered]@{} }
     (Get-ColorBlock $scheme).GetEnumerator() | ForEach-Object { $colors[$_.Key] = $_.Value }
     $json['workbench.colorCustomizations'] = $colors
-    $json['peacock.color'] = $scheme.Bg      # falls Peacock installiert ist, bleibt es konsistent
+    $json.Remove('peacock.color')            # sonst überschreibt Peacock die Farben mit eigenen Werten
     $json['window.title']  = "[$($scheme.Label)] `${rootName}`${separator}`${activeEditorShort}"
 
     if ($PSCmdlet.ShouldProcess($repo.FullName, "Farben '$type' setzen")) {
