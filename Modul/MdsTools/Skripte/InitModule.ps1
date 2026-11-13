@@ -26,7 +26,7 @@ catch { }
 
 # Globale Variablen (MdsTools.md, Abschnitt Globale Variablen).
 # Regel: $env:DEV_<NAME> lenkt genau den Ordner <Name> um (DEV_REPOS, DEV_ROOT, DEV_BIN, ...).
-# Gleiche Logik wie die C#-Klasse xBase.BaseRoot in NetCoreLib2026.
+# Gleiche Logik wie die C#-Klasse xBase.BaseRoot im Repo Net (GitHub NetCoreLib2026).
 function Get-DevOrdner([string]$Name, [string]$Basis) {
     $wert = [Environment]::GetEnvironmentVariable("DEV_$($Name.ToUpperInvariant())")
     if ($wert) { $wert } else { Join-Path $Basis $Name }
