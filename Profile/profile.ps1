@@ -12,6 +12,7 @@
 #               08.11.2026 Hubi/Claude: Anaconda auf macOS (Homebrew), $condaRoot/Get-CondaPython, py/py313/py315
 #               08.11.2026 Hubi/Claude: MARS auf Anaconda 2026.07, py/py313/py315/pyb fuer Windows und macOS gleich
 #               10.11.2026 Hubi/Claude: macOS: ping sendet wie unter Windows 4 Pakete
+#               14.11.2026 Hubi/Claude: maui oeffnet den Maui-Workspace (Maui.code-workspace) in VS Code
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -24,6 +25,12 @@ function Save-Develop() {
             Backup-Develop -sourceDir $repo.FullName -force | Out-Null
         }
     }
+}
+
+# 2026-11-14 Hubi/Claude: oeffnet den Maui-Workspace (Maui + Net-Bibliotheken) statt nur des Ordners
+function maui {
+    $ws = Join-Path $mdsRepos 'Maui/Maui.code-workspace'
+    if (Test-Path -LiteralPath $ws) { code $ws } else { Write-Warning "Workspace nicht gefunden: $ws" }
 }
 
 # Anaconda-Basisordner: Windows systemweit, macOS per Homebrew (brew install --cask anaconda)

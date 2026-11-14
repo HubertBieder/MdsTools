@@ -5,7 +5,8 @@
 
 .DESCRIPTION
     Durchsucht alle Git-Repos direkt unterhalb von -Root, erkennt den Typ anhand der Dateien
-    und schreibt/merged .vscode/settings.json (workbench.colorCustomizations, peacock.color, window.title).
+    und schreibt/merged .vscode/settings.json und *.code-workspace im Repo-Root
+    (workbench.colorCustomizations, window.title; peacock.color wird entfernt).
     Andere Einstellungen bleiben erhalten. Die settings.json wird mit committet,
     dadurch sind die Farben auf LUNA (macOS) und MARS (Windows) automatisch gleich.
 
@@ -43,6 +44,10 @@
     1.8.0    2026-11-13  Claude/Hubi   PowerShell: alle drei Bereiche einheitlich #43A047, inaktive Schrift heller (DD)
     1.9.0    2026-11-13  Claude/Hubi   Python: alle drei Bereiche einheitlich #D9A21B
     1.10.0   2026-11-13  Claude/Hubi   Titelzeile unfokussierter Fenster in voller Farbe (ohne Transparenz)
+    1.11.0   2026-11-14  Claude/Hubi   Nur schreiben, wenn sich etwas ändert; atomar über Temp-Datei,
+                                       damit offene VS-Code-Fenster nicht auf Schwarz zurückfallen
+    1.12.0   2026-11-14  Claude/Hubi   Auch *.code-workspace im Repo-Root einfärben (Multi-Root-Workspaces);
+                                       abschließende Kommas in JSONC werden toleriert
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -118,39 +123,62 @@ if (-not (Test-Path $Root)) { throw "Root nicht gefunden: $Root" }
 $repos = Get-ChildItem -Path $Root -Directory |
          Where-Object { Test-Path (Join-Path $_.FullName '.git') }
 
+function Set-ColorSettings {
+    # Farben, Titel in ein Settings-Objekt mergen (fremde Schlüssel bleiben erhalten)
+    param($Settings, $Scheme)
+    $colors = if ($Settings.Contains('workbench.colorCustomizations')) { $Settings['workbench.colorCustomizations'] } else { [ordered]@{} }
+    (Get-ColorBlock $Scheme).GetEnumerator() | ForEach-Object { $colors[$_.Key] = $_.Value }
+    $Settings['workbench.colorCustomizations'] = $colors
+    $Settings.Remove('peacock.color')            # sonst überschreibt Peacock die Farben mit eigenen Werten
+    $Settings['window.title'] = "[$($Scheme.Label)] `${rootName}`${separator}`${activeEditorShort}"
+}
+
+function Read-JsonFile {
+    # JSON/JSONC lesen (pwsh 7 toleriert // Kommentare); $null = nicht lesbar
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return [ordered]@{} }
+    $raw = Get-Content -LiteralPath $Path -Raw
+    if (-not $raw.Trim()) { return [ordered]@{} }
+    # 1.12.0: abschließende Kommas (in .code-workspace üblich) vor } bzw. ] entfernen
+    $raw = [regex]::Replace($raw, ',(\s*[\}\]])', '$1')
+    return ($raw | ConvertFrom-Json -AsHashtable)
+}
+
+function Write-JsonIfChanged {
+    # Nur schreiben, wenn sich etwas ändert; atomar über Temp-Datei + Umbenennen
+    param([string]$Path, $Object, [string]$Info)
+    $neu = ($Object | ConvertTo-Json -Depth 20) + "`n"
+    $alt = if (Test-Path -LiteralPath $Path) { Get-Content -LiteralPath $Path -Raw } else { $null }
+    if ($alt -and ($alt -replace "`r`n", "`n").TrimEnd() -eq $neu.TrimEnd()) {
+        Write-Host "$Info  (unverändert)" -ForegroundColor DarkGray
+        return
+    }
+    $dir = Split-Path -Parent $Path
+    $tmp = Join-Path $dir ((Split-Path -Leaf $Path) + '.tmp-' + [guid]::NewGuid().ToString('N'))
+    [System.IO.File]::WriteAllText($tmp, $neu, [System.Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $tmp -Destination $Path -Force
+    Write-Host $Info -ForegroundColor Green
+}
+
 foreach ($repo in $repos) {
     $type = Get-RepoType -Path $repo.FullName
     if (-not $type) {
         Write-Warning "$($repo.Name): Typ nicht erkannt - übersprungen."
         continue
     }
-    $scheme   = $Schemes[$type]
+    $scheme = $Schemes[$type]
+    $info   = "{0,-10} -> {1,-10} {2}" -f $repo.Name, $type, $scheme.Bg
+
+    # --- Ordner: .vscode/settings.json ---
     $vsDir    = Join-Path $repo.FullName '.vscode'
     $settings = Join-Path $vsDir 'settings.json'
+    try { $json = Read-JsonFile $settings }
+    catch { Write-Warning "$($repo.Name): settings.json nicht lesbar ($($_.Exception.Message)) - übersprungen."; continue }
+    Set-ColorSettings $json $scheme
 
-    # Vorhandene settings.json einlesen (pwsh 7 toleriert // Kommentare)
-    $json = [ordered]@{}
-    if (Test-Path $settings) {
-        try {
-            $raw  = Get-Content $settings -Raw
-            $json = if ($raw.Trim()) { $raw | ConvertFrom-Json -AsHashtable } else { [ordered]@{} }
-        } catch {
-            Write-Warning "$($repo.Name): settings.json nicht lesbar ($($_.Exception.Message)) - übersprungen."
-            continue
-        }
-    }
-
-    # Farben mergen (fremde colorCustomizations-Schlüssel bleiben erhalten)
-    $colors = if ($json.Contains('workbench.colorCustomizations')) { $json['workbench.colorCustomizations'] } else { [ordered]@{} }
-    (Get-ColorBlock $scheme).GetEnumerator() | ForEach-Object { $colors[$_.Key] = $_.Value }
-    $json['workbench.colorCustomizations'] = $colors
-    $json.Remove('peacock.color')            # sonst überschreibt Peacock die Farben mit eigenen Werten
-    $json['window.title']  = "[$($scheme.Label)] `${rootName}`${separator}`${activeEditorShort}"
-
-    if ($PSCmdlet.ShouldProcess($repo.FullName, "Farben '$type' setzen")) {
+    if ($PSCmdlet.ShouldProcess($settings, "Farben '$type' setzen")) {
         New-Item -ItemType Directory -Path $vsDir -Force | Out-Null
-        $json | ConvertTo-Json -Depth 10 | Set-Content -Path $settings -Encoding utf8NoBOM
-        Write-Host ("{0,-10} -> {1,-10} {2}" -f $repo.Name, $type, $scheme.Bg) -ForegroundColor Green
+        Write-JsonIfChanged $settings $json $info
 
         if ($ExcludeFromGit) {
             $exclude = Join-Path $repo.FullName '.git/info/exclude'
@@ -158,6 +186,18 @@ foreach ($repo in $repos) {
             if (-not (Select-String -Path $exclude -SimpleMatch $line -Quiet -ErrorAction SilentlyContinue)) {
                 Add-Content -Path $exclude -Value $line
             }
+        }
+    }
+
+    # --- 1.12.0: Workspace-Dateien im Repo-Root (*.code-workspace) ---
+    #     Im Multi-Root-Workspace gelten Farben/Titel nur aus der Workspace-Datei, nicht aus den Ordnern.
+    foreach ($wsFile in Get-ChildItem -LiteralPath $repo.FullName -File -Filter '*.code-workspace') {
+        try { $ws = Read-JsonFile $wsFile.FullName }
+        catch { Write-Warning "$($wsFile.Name): nicht lesbar ($($_.Exception.Message)) - übersprungen."; continue }
+        if (-not $ws.Contains('settings')) { $ws['settings'] = [ordered]@{} }
+        Set-ColorSettings $ws['settings'] $scheme
+        if ($PSCmdlet.ShouldProcess($wsFile.FullName, "Farben '$type' setzen")) {
+            Write-JsonIfChanged $wsFile.FullName $ws ("{0,-10}    {1}" -f '', $wsFile.Name)
         }
     }
 }
