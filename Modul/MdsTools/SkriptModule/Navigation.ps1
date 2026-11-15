@@ -272,7 +272,15 @@ function run([string] $Skript = "", [switch] $List) {
     }
     $name = $namen[0]
     $pfad = Join-Path (Join-Path (Join-Path $mdsRepos $treffer) 'scripts') "_$name.ps1"
-    & $pfad @weiter
+    # 2026-11-15 Hubi/Claude: Verzeichnis nach dem Skript immer wiederherstellen - ein
+    # Set-Location im Skript (oder in dem, was es aufruft) bleibt sonst in der Sitzung stehen.
+    Push-Location
+    try {
+        & $pfad @weiter
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 Register-ArgumentCompleter -CommandName run -ParameterName Skript -ScriptBlock {

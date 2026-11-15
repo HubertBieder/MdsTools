@@ -14,6 +14,7 @@
 #               10.11.2026 Hubi/Claude: macOS: ping sendet wie unter Windows 4 Pakete
 #               14.11.2026 Hubi/Claude: maui oeffnet den Maui-Workspace (Maui.code-workspace) in VS Code
 #               15.11.2026 Hubi/Claude: mars@, test@, prod@ oeffnen die Remote-Shell (woyShell.ps1 aus Modul/Skripte)
+#               15.11.2026 Hubi/Claude: Admin-Shell startet in $mdsRepos statt C:\Windows\System32
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -98,6 +99,11 @@ function Show-Header([string] $os) {
 }
 
 Clear-Host
+# 2026-11-15 Hubi/Claude: Eine Shell "als Administrator" startet in C:\Windows\System32 -
+# dort kennt run nur die globalen Skripte. Stattdessen in den Repos beginnen.
+if ($IsWindows -and $PWD.Provider.Name -eq 'FileSystem' -and $PWD.Path -eq [Environment]::SystemDirectory) {
+    Set-Location -LiteralPath $mdsRepos
+}
 $os = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "MacOS" } else { "Linux" }
 Write-Host (Show-Header -os $os) -ForegroundColor blue
 Remove-Variable os
