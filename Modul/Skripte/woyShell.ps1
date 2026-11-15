@@ -218,7 +218,8 @@ function Invoke-RemoteTab([int]$Richtung) {
 }
 #endregion
 
-function Get-Prompt { "[$Rechner] $($script:cwd)> " }
+# [MARS*] = Sitzung mit Administratorrechten (Dienstkonto ist Administrator), [MARS] = ohne
+function Get-Prompt { "[$Rechner$(if ($script:admin) { '*' })] $($script:cwd)> " }
 
 #region Verbinden und anmelden
 $script:ws = [Net.WebSockets.ClientWebSocket]::new()
@@ -243,6 +244,9 @@ if ($ready.proof -ne (Get-Hmac $Token "srv|$($hello.nonce)|$cnonce")) {
     throw "Gegenstelle $Url kennt den Schluessel nicht - Verbindung abgebrochen"
 }
 $Rechner = $ready.rechner
+# Aeltere Dienste melden konto/admin noch nicht
+$script:admin = [bool]($ready.PSObject.Properties['admin'] -and $ready.admin)
+$script:konto = if ($ready.PSObject.Properties['konto']) { $ready.konto } else { '' }
 $script:cwd = $ready.cwd
 #endregion
 
@@ -257,6 +261,10 @@ try {
     else {
 
     Write-Host "Remote-Shell $Rechner ($Url) - exit beendet, Strg+C bricht ab" -ForegroundColor DarkGray
+    if ($script:konto) {
+        if ($script:admin) { Write-Host "Konto $($script:konto) - Administrator (Prompt [$Rechner*])" -ForegroundColor DarkGray }
+        else { Write-Host "Konto $($script:konto) - OHNE Administratorrechte (Prompt [$Rechner])" -ForegroundColor Yellow }
+    }
     if ($ready.PSObject.Properties['banner'] -and $ready.banner) {
         foreach ($z in ($ready.banner -split "`n")) {
             Write-Host $z -ForegroundColor $(if ($z.StartsWith('!!')) { 'Red' } else { 'DarkGray' })
