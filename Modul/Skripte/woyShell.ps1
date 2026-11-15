@@ -275,9 +275,12 @@ function Connect-Shell {
 # Nach Update/DBS: AufServiceNT wird neu installiert, die Verbindung bricht ab. Wartet, bis
 # der Dienst wieder antwortet (hoechstens $Sekunden), verbindet neu und zeigt mit
 # "UpdateLog -Wait" das Protokoll, sobald das Update fertig ist. $true = es geht weiter.
+# 2026-11-15 Hubi/Claude: Auch wenn die Verbindung erst waehrend "UpdateLog -Wait" abbricht
+#   (der Dienst war beim ersten Neuverbinden noch der alte), wird weiter gewartet - hoechstens 3-mal.
 function Wait-Wiederverbinden([int]$Sekunden = 120) {
-    Write-Host "[$Rechner] Verbindung beendet - AufServiceNT wird neu installiert, warte bis zu $Sekunden s ..." -ForegroundColor Yellow
+    Write-Host "[$Rechner] AufServiceNT wird neu installiert, warte bis zu $Sekunden s auf den Dienst ..." -ForegroundColor Yellow
     $ende = [DateTime]::UtcNow.AddSeconds($Sekunden)
+    $abbrueche = 0
     Start-Sleep -Seconds 5
     while ([DateTime]::UtcNow -lt $ende) {
         try {
@@ -285,7 +288,11 @@ function Wait-Wiederverbinden([int]$Sekunden = 120) {
             Write-Host ''
             Write-Host "[$Rechner] wieder verbunden" -ForegroundColor Green
             $ok = Invoke-Remote 'UpdateLog -Wait'
-            return ($null -ne $ok)
+            if ($null -ne $ok) { return $true }
+            if (++$abbrueche -ge 3) { break }
+            Write-Host "[$Rechner] Verbindung erneut beendet - warte weiter ..." -ForegroundColor Yellow
+            $ende = [DateTime]::UtcNow.AddSeconds($Sekunden)
+            Start-Sleep -Seconds 5
         }
         catch {
             Write-Host '.' -NoNewline -ForegroundColor DarkGray
@@ -311,7 +318,8 @@ $altPrompt = $null
 try {
     if ($Command) {
         $ok = Invoke-Remote $Command
-        if ($null -eq $ok -and ($script:wiederverbinden -or (Test-UpdateBefehl $Command))) {
+        # Markierung gesehen: immer neu verbinden, auch wenn der Befehl vor dem Abbruch fertig war
+        if ($script:wiederverbinden -or ($null -eq $ok -and (Test-UpdateBefehl $Command))) {
             $ok = Wait-Wiederverbinden
         }
         $exitCode = if ($null -eq $ok) { 2 } elseif ($ok) { 0 } else { 1 }
@@ -363,7 +371,7 @@ try {
         if ($zeile.Trim() -in 'exit', 'quit', 'logout') { break }
         if ($zeile.Trim().Length -eq 0) { continue }
         $ok = Invoke-Remote $zeile
-        if ($null -eq $ok -and ($script:wiederverbinden -or (Test-UpdateBefehl $zeile))) {
+        if ($script:wiederverbinden -or ($null -eq $ok -and (Test-UpdateBefehl $zeile))) {
             if (Wait-Wiederverbinden) { continue }
             $exitCode = 2
             break

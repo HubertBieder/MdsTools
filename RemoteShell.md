@@ -7,6 +7,7 @@
 | Datum      | Version | Autor                | Änderung                                                                  |
 | ---------- | ------- | -------------------- | ------------------------------------------------------------------------- |
 | 2026-11-15 | 0.1     | Hubert Bieder/Claude | Neu: Schnittstelle, Einrichtung, Befehle, Update; Aufrufe von LUNA aus    |
+| 2026-11-15 | 0.2     | Hubert Bieder/Claude | Update bei gleichem Stand: nichts zu tun, `-Force`; Neuverbinden auch nach fertigem Befehl |
 
 ## Worum es geht
 
@@ -118,7 +119,7 @@ Alles, was PowerShell 7 auf dem Zielrechner kann, plus diese Kurzbefehle:
 | Befehl                           | Wirkung                                                                           |
 | -------------------------------- | --------------------------------------------------------------------------------- |
 | `Show`                           | Stand der Installation (`woyControlCenter Show`)                                  |
-| `Update`                         | Programme aktualisieren (`woyControlCenter Update`)                               |
+| `Update [-Force]`                | Programme aktualisieren (`woyControlCenter Update`); `-Force` auch bei gleichem Stand |
 | `woyControlCenter D`             | Update mit Datenbanken (DBS)                                                      |
 | `woyControlCenter ?`             | Hilfe des woyControlCenter                                                        |
 | `UpdateLog [-Wait] [-Minuten n]` | letztes Update-Protokoll; `-Wait` wartet erst auf das Ende (höchstens n, Vorgabe 15 Minuten) |
@@ -145,6 +146,15 @@ trägt. Deshalb läuft der Ablauf so:
 4. Das Protokoll erscheint, sobald woyControlCenter fertig ist.
 
 Kommt der Dienst nicht rechtzeitig zurück, später mit `prod@` verbinden und `UpdateLog -Wait` eingeben.
+Ist der Befehl schon fertig, bevor der Dienst die Verbindung trennt, verbindet `woyShell.ps1` trotzdem neu
+und wartet auf das Protokoll.
+
+**Gleicher Stand:** Ist die `Dateiliste.txt` im `InstallDir` dieselbe wie die installierte im `Config`, ist
+genau dieser Build schon eingespielt. `Update` hält dann nichts an, entpackt nichts und endet mit
+„erfolgreich beendet (keine neue Version)“, Rückgabe 0. Verglichen wird die ganze Datei, nicht nur die Version:
+Die Version besteht nur aus Jahr und Tag (`26.0_1115`), zwei Builds eines Tages hätten dieselbe. Die
+Dateiliste trägt zusätzlich die Uhrzeit. `Update -Force` (bzw. `run auf update test -Force`) spielt trotzdem
+ein. `woyControlCenter D` (mit Datenbanken) läuft immer.
 
 Vor dem Update müssen die neuen Installationsdateien im `InstallDir` des Zielrechners liegen. Das erledigt
 `run auf copy` auf MARS.
