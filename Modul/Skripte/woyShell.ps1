@@ -172,19 +172,35 @@ function Write-Ausgabe($m) {
     }
 }
 
+# Markierung, die Update/DBS auf dem Dienst ausgeben: gleich bricht die Verbindung ab, weil
+# AufServiceNT neu installiert wird - danach neu verbinden (siehe Wait-Wiederverbinden).
+$K_Marke = '##WOYSHELL:WIEDERVERBINDEN##'
+$script:wiederverbinden = $false
+
 # Fuehrt ein Kommando aus und gibt die Ausgaben aus. Ergebnis: $true/$false, $null = Verbindung weg
 function Invoke-Remote([string]$Text) {
-    Send-Msg @{ t = 'cmd'; text = $Text; width = (Get-Breite) }
+    $script:wiederverbinden = $false
     $alt = $null
     try { $alt = [Console]::TreatControlCAsInput; [Console]::TreatControlCAsInput = $true } catch { }
     try {
+        Send-Msg @{ t = 'cmd'; text = $Text; width = (Get-Breite) }
         while ($true) {
             $m = Receive-Msg -Abbrechbar
             if ($null -eq $m) { return $null }
             if ($m.t -eq 'done') { $script:cwd = $m.cwd; return [bool]$m.ok }
             if ($m.t -eq 'fehler') { Write-Ausgabe $m; return $null }
+            if ($m.t -eq 'out' -and $m.s.Contains($K_Marke)) {
+                $script:wiederverbinden = $true
+                $m.s = $m.s.Replace($K_Marke, '').Trim()
+                if (-not $m.s) { continue }
+                $m.s += "`n"
+            }
             Write-Ausgabe $m
         }
+    }
+    catch {
+        # Verbindung abgerissen (z. B. Dienst beendet) - wie geschlossen behandeln
+        return $null
     }
     finally {
         if ($null -ne $alt) { try { [Console]::TreatControlCAsInput = $alt } catch { } }
@@ -222,32 +238,71 @@ function Invoke-RemoteTab([int]$Richtung) {
 function Get-Prompt { "[$Rechner$(if ($script:admin) { '*' })] $($script:cwd)> " }
 
 #region Verbinden und anmelden
-$script:ws = [Net.WebSockets.ClientWebSocket]::new()
-$script:ws.Options.KeepAliveInterval = [TimeSpan]::FromSeconds(30)
-try {
-    $verbinde = $script:ws.ConnectAsync([Uri]$Url, [Threading.CancellationToken]::None)
-    if (-not $verbinde.Wait(10000)) { throw "keine Antwort in 10 s" }
-}
-catch {
-    $msg = $_.Exception.GetBaseException().Message
-    throw "Verbindung zu $Url fehlgeschlagen: $msg (AufServiceNT laeuft? Remote-Shell im woyControlCenter eingeschaltet und Dienst neu gestartet? Port 60000 in der Firewall frei?)"
+# Baut die Verbindung auf und meldet sich an; Ergebnis ist die ready-Nachricht. Wirft bei Fehler.
+function Connect-Shell {
+    if ($script:ws) { try { $script:ws.Dispose() } catch { } }
+    $script:empfang = $null
+    $script:teile.SetLength(0)
+    $script:ws = [Net.WebSockets.ClientWebSocket]::new()
+    $script:ws.Options.KeepAliveInterval = [TimeSpan]::FromSeconds(30)
+    try {
+        $verbinde = $script:ws.ConnectAsync([Uri]$Url, [Threading.CancellationToken]::None)
+        if (-not $verbinde.Wait(10000)) { throw "keine Antwort in 10 s" }
+    }
+    catch {
+        $msg = $_.Exception.GetBaseException().Message
+        throw "Verbindung zu $Url fehlgeschlagen: $msg (AufServiceNT laeuft? Remote-Shell im woyControlCenter eingeschaltet und Dienst neu gestartet? Port 60000 in der Firewall frei?)"
+    }
+
+    $hello = Receive-Msg -TimeoutMs 10000
+    if (-not $hello -or $hello -eq 'TIMEOUT' -or $hello.t -ne 'hello') { throw "Unerwartete Antwort von $Url" }
+    $cnonce = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+    Send-Msg @{ t = 'auth'; mac = (Get-Hmac $Token $hello.nonce); cnonce = $cnonce }
+    $antwort = Receive-Msg -TimeoutMs 30000
+    if (-not $antwort -or $antwort -eq 'TIMEOUT') { throw "Keine Antwort auf die Anmeldung" }
+    if ($antwort.t -ne 'ready') { throw "[$Rechner] $($antwort.s)" }
+    if ($antwort.proof -ne (Get-Hmac $Token "srv|$($hello.nonce)|$cnonce")) {
+        throw "Gegenstelle $Url kennt den Schluessel nicht - Verbindung abgebrochen"
+    }
+    $script:Rechner = $antwort.rechner
+    # Aeltere Dienste melden konto/admin noch nicht
+    $script:admin = [bool]($antwort.PSObject.Properties['admin'] -and $antwort.admin)
+    $script:konto = if ($antwort.PSObject.Properties['konto']) { $antwort.konto } else { '' }
+    $script:cwd = $antwort.cwd
+    return $antwort
 }
 
-$hello = Receive-Msg -TimeoutMs 10000
-if (-not $hello -or $hello -eq 'TIMEOUT' -or $hello.t -ne 'hello') { throw "Unerwartete Antwort von $Url" }
-$cnonce = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-Send-Msg @{ t = 'auth'; mac = (Get-Hmac $Token $hello.nonce); cnonce = $cnonce }
-$ready = Receive-Msg -TimeoutMs 30000
-if (-not $ready -or $ready -eq 'TIMEOUT') { throw "Keine Antwort auf die Anmeldung" }
-if ($ready.t -ne 'ready') { throw "[$Rechner] $($ready.s)" }
-if ($ready.proof -ne (Get-Hmac $Token "srv|$($hello.nonce)|$cnonce")) {
-    throw "Gegenstelle $Url kennt den Schluessel nicht - Verbindung abgebrochen"
+# Nach Update/DBS: AufServiceNT wird neu installiert, die Verbindung bricht ab. Wartet, bis
+# der Dienst wieder antwortet (hoechstens $Sekunden), verbindet neu und zeigt mit
+# "UpdateLog -Wait" das Protokoll, sobald das Update fertig ist. $true = es geht weiter.
+function Wait-Wiederverbinden([int]$Sekunden = 120) {
+    Write-Host "[$Rechner] Verbindung beendet - AufServiceNT wird neu installiert, warte bis zu $Sekunden s ..." -ForegroundColor Yellow
+    $ende = [DateTime]::UtcNow.AddSeconds($Sekunden)
+    Start-Sleep -Seconds 5
+    while ([DateTime]::UtcNow -lt $ende) {
+        try {
+            $null = Connect-Shell
+            Write-Host ''
+            Write-Host "[$Rechner] wieder verbunden" -ForegroundColor Green
+            $ok = Invoke-Remote 'UpdateLog -Wait'
+            return ($null -ne $ok)
+        }
+        catch {
+            Write-Host '.' -NoNewline -ForegroundColor DarkGray
+            Start-Sleep -Seconds 3
+        }
+    }
+    Write-Host ''
+    Write-Host "[$Rechner] Dienst nach $Sekunden s nicht erreichbar - spaeter neu verbinden und 'UpdateLog -Wait' aufrufen" -ForegroundColor Red
+    return $false
 }
-$Rechner = $ready.rechner
-# Aeltere Dienste melden konto/admin noch nicht
-$script:admin = [bool]($ready.PSObject.Properties['admin'] -and $ready.admin)
-$script:konto = if ($ready.PSObject.Properties['konto']) { $ready.konto } else { '' }
-$script:cwd = $ready.cwd
+
+# Update-Befehle auch erkennen, wenn ein aelterer Dienst die Markierung noch nicht sendet
+function Test-UpdateBefehl([string]$Text) {
+    return $Text -match '^\s*(Update|woyControlCenter\s+[-/]?(u|up|upd|upda|updat|update|d|db|dbs))\b'
+}
+
+$ready = Connect-Shell
 #endregion
 
 $exitCode = 0
@@ -256,6 +311,9 @@ $altPrompt = $null
 try {
     if ($Command) {
         $ok = Invoke-Remote $Command
+        if ($null -eq $ok -and ($script:wiederverbinden -or (Test-UpdateBefehl $Command))) {
+            $ok = Wait-Wiederverbinden
+        }
         $exitCode = if ($null -eq $ok) { 2 } elseif ($ok) { 0 } else { 1 }
     }
     else {
@@ -305,6 +363,11 @@ try {
         if ($zeile.Trim() -in 'exit', 'quit', 'logout') { break }
         if ($zeile.Trim().Length -eq 0) { continue }
         $ok = Invoke-Remote $zeile
+        if ($null -eq $ok -and ($script:wiederverbinden -or (Test-UpdateBefehl $zeile))) {
+            if (Wait-Wiederverbinden) { continue }
+            $exitCode = 2
+            break
+        }
         if ($null -eq $ok) {
             Write-Host "[$Rechner] Verbindung beendet" -ForegroundColor Red
             $exitCode = 2
