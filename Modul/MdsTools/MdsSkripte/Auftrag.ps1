@@ -8,18 +8,19 @@
 #   2026-11-03  Hubi/Claude  Aus mdsProfile.ps1 uebernommen (Clear-WoyProcess, Write-WoyVersionCS,
 #                            Write-DateiListe); $woyVersion -> $mdsWoy, $woyBaseDir -> $mdsWoySrc
 #   2026-11-03  Hubi/Claude  Get-WoyServerShare (aus Auf/scripts/_copy.ps1, auch fuer _version.ps1)
+#   2026-11-15  Hubi/Claude  Get-WoyServerShare: 'p...' (PROD) gilt wie 's...' (SQL-SRV)
 #======================================================================
 
-# [global] UNC-Wurzel der Freigabe woyAufInstall auf TEST-SRV ('t...') bzw. SQL-SRV ('s...'), sonst $null.
+# [global] UNC-Wurzel der Freigabe woyAufInstall auf TEST-SRV ('t...') bzw. SQL-SRV ('s...' oder 'p...' = PROD), sonst $null.
 #   Adressen aus der woy.env (WOY_TESTSRV, WOY_SQLSRV), ohne Eintrag TEST-SRV bzw. SQL-SRV.
 function global:Get-WoyServerShare([string] $Name) {
     [string] $address = switch -Regex ($Name.Trim()) {
         '^(?i)t' { Get-WoyValue -Key 'WOY_TESTSRV' -Default 'TEST-SRV' }
-        '^(?i)s' { Get-WoyValue -Key 'WOY_SQLSRV' -Default 'SQL-SRV' }
+        '^(?i)[sp]' { Get-WoyValue -Key 'WOY_SQLSRV' -Default 'SQL-SRV' }
         default { '' }
     }
     if (-not $address) {
-        Write-Error "Unbekannter Server '$Name' (erwartet: t... fuer TEST-SRV oder s... fuer SQL-SRV)."
+        Write-Error "Unbekannter Server '$Name' (erwartet: t... fuer TEST-SRV, s... oder p... fuer SQL-SRV/PROD)."
         return $null
     }
     return "\\$address\woyAufInstall"

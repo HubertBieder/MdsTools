@@ -47,6 +47,7 @@
 | 2026-11-11 | 0.41    | Hubert Bieder/Claude | 8.3.6: PowerShell-Linie 7.6 (`Update-PowerShell -Last`/`-Version`, `Update-PowerShell7.ps1 -Linie`) |
 | 2026-11-12 | 0.42    | Hubert Bieder/Claude | 8.4.0: `Save-Desktop`/`Restore-Desktop` für Desktop-Symbole, Datei je Rechner (`luna.json`, `mars.json`) |
 | 2026-11-15 | 0.43    | Hubert Bieder/Claude | `$mdsCloud` (iCloud `Documents/Config`), `$mdsWoyShell` (Remote-Shell) und ihre Zeilen in `Show-Mds`; `woyShell.ps1` unter `Modul/Skripte` |
+| 2026-11-15 | 0.44    | Hubert Bieder/Claude | `run mds install`; `run auf update test\|prod`, `run auf copy p` (= SQL-SRV); Remote-Shell in [RemoteShell.md](RemoteShell.md) |
 
 ---
 
@@ -143,6 +144,7 @@ wie `Resolve-MdsPath` müssen nicht exportiert werden.
 
 `Modul/Skripte/` wird von `Install.ps1` nach `$mdsRepos` kopiert, aber nur, wenn die Quelle neuer ist.
 Dazu gehört `woyShell.ps1`, der Client der Remote-Shell von AufServiceNT (Profil: `mars@`, `test@`, `prod@`).
+Schnittstelle, Einrichtung und Befehle beschreibt [RemoteShell.md](RemoteShell.md).
 
 ## Initialisierung und Ablauf
 
@@ -379,9 +381,11 @@ erkennbar: `scripts/_<Name>.ps1`. Dateien ohne Präfix (z. B. `Make.ps1`, Hilfss
 | Repo | Aufruf                       | Skript                 | Zweck                                                                 |
 | ---- | ---------------------------- | ---------------------- | --------------------------------------------------------------------- |
 | Mds  | `run back[up] [Repo] [-Force] [-Verbose]` | `scripts/_backup.ps1` | global: Repo als `<Repo>_yyyyMMdd.zip` sichern – angegebenes Repo, sonst das aktuelle, außerhalb der Repos Mds; `-Force` erstellt ein vorhandenes Tagesarchiv neu |
+| Mds  | `run mds install` | `scripts/_install.ps1` | global: `Mds/Install.ps1` in eigenem pwsh-Prozess (Modul, Profil, globale Skripte); danach neue Shell |
 | Mds  | `run mars [-Go]` | `scripts/_mars.ps1` | global, nur macOS: MARS bei Bedarf per Wake-on-LAN wecken (LAN `192.168.104.59`), hängende Freigaben `woyCode`/`woyAufInstall` lösen und neu einbinden; `-Go` wechselt nach `/Volumes/woyCode` |
 | Auf  | `run auf auto [-MitDatenbank]` | `scripts/_auto.ps1`  | bauen (`mk auf`), lokal kopieren, woyControlCenter starten            |
-| Auf  | `run auf copy [t\|s]`        | `scripts/_copy.ps1`    | Deck nach InstallDir: lokal, TEST-SRV, SQL-SRV                        |
+| Auf  | `run auf copy [t\|s\|p]`     | `scripts/_copy.ps1`    | Deck nach InstallDir: lokal, TEST-SRV, SQL-SRV (`p` = PROD = SQL-SRV) |
+| Auf  | `run auf update t\|p`        | `scripts/_update.ps1`  | Update auf TEST bzw. PROD über die Remote-Shell ([RemoteShell.md](RemoteShell.md)) |
 | Auf  | `run auf version [-Verbose]` | `scripts/_version.ps1` | Versionen aus `Dateiliste.txt` an allen Stellen                       |
 | Auf  | `run auf backup`             | `scripts/_backup.ps1`  | Repo als `Auf_yyyyMMdd.zip` sichern, Pfad und Größe ausgeben          |
 | Auf  | `run auf desktop`            | `scripts/_desktop.ps1` | alle Desktop-Verknüpfungen der Auftragsabwicklung anlegen             |
@@ -625,6 +629,7 @@ Buchstabe des Ziels reicht.
 | `run auf copy`   | `D:\woySystems\InstallDir` (lokal auf MARS)                 |
 | `run auf copy t` | `\\TEST-SRV\woyAufInstall\InstallDir`, dazu `Bin\RepApp`    |
 | `run auf copy s` | `\\SQL-SRV\woyAufInstall\InstallDir`                        |
+| `run auf copy p` | wie `s` (PROD = SQL-SRV)                                    |
 
 Für Freigaben meldet sich das Skript mit `Get-WoyCredential 'server'` an. Es definiert die globalen Funktionen
 `Publish-Auf2000 [<Ziel>]` und `Get-WoyServerShare <Ziel>`, die danach in der Sitzung aufrufbar bleiben.
@@ -639,7 +644,17 @@ Für Freigaben meldet sich das Skript mit `Get-WoyCredential 'server'` an. Es de
 | `run auf desktop`            | `_desktop.ps1` | alle Desktop-Verknüpfungen: D@, D0–D5 auf die run-Skripte, C, M, T, S, R auf die         |
 |                              |                | Programme in `$mdsWoyBin`                                                               |
 
-`Get-WoyServerShare <t|s>` (UNC-Wurzel `\\<Server>\woyAufInstall`) steht in `MdsSkripte/Auftrag.ps1`.
+`Get-WoyServerShare <t|s|p>` (UNC-Wurzel `\\<Server>\woyAufInstall`, `p` = SQL-SRV) steht in `MdsSkripte/Auftrag.ps1`.
+
+#### run auf update – Update auf TEST oder PROD
+
+`Auf/scripts/_update.ps1` ruft `woyShell.ps1 TEST|PROD -Command 'Update'` auf. Auf dem Zielrechner läuft dann
+`woyControlCenter Update`. Die Remote-Shell verbindet sich nach der Neuinstallation von AufServiceNT selbst
+neu und zeigt das Protokoll. Der erste Buchstabe reicht: `t` = TEST (TEST-SRV), `p` oder `s` = PROD (SQL-SRV).
+Vorher die Dateien mit `run auf copy t|p` verteilen.
+
+Auf LUNA gibt es das Repo Auf nicht. Dort geht dasselbe mit `test@ -Command 'Update'` bzw.
+`prod@ -Command 'Update'`, siehe [RemoteShell.md](RemoteShell.md).
 
 #### run auf backup – Repo sichern
 

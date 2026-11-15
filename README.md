@@ -10,6 +10,7 @@
 | ---------- | ------- | -------------------- | --------------------------------------------------------- |
 | 2026-10-31 | 0.1     | Hubert Bieder        | README formatiert, Historie ergänzt, Pfad relativ gesetzt |
 | 2026-11-03 | 0.2     | Hubert Bieder/Claude | Neu als Einführung in das Repo                            |
+| 2026-11-15 | 0.3     | Hubert Bieder/Claude | RemoteShell.md; `run mds install`                         |
 
 ## Worum es geht
 
@@ -28,6 +29,7 @@ denselben Befehlen:
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [MDS-Development.md](MDS-Development.md)       | **Systematik**: Systeme, PowerShell 7, Verzeichnisstruktur macOS/Windows, `DEV_<NAME>`, Repos und ihre Konventionen |
 | [MdsTools.md](MdsTools.md)                     | **Modul**: Aufbau, Variablen, `go`/`mk`/`run`/`Show-Mds`, Cmdlets, Auftragsabwicklung (Windows)                     |
+| [RemoteShell.md](RemoteShell.md)               | **Remote-Shell**: PowerShell auf MARS/TEST/PROD über AufServiceNT, `mars@`/`test@`/`prod@`, Update – auch von LUNA |
 | [Luna.md](Luna.md) / [Mars.md](Mars.md)        | **Offene Aufgaben**: erst allgemein und LUNA, danach MARS in einem Stück                                            |
 | [Anaconda.md](Anaconda.md)                     | **Python**: Anaconda-Installation macOS/Windows, Umgebungen py314/py313/py315, Profil-Befehle `py`/`pyb`            |
 
@@ -51,6 +53,8 @@ git clone https://github.com/HubertBieder/MdsTools.git ~/Repos/Mds   # Windows: 
 cd ~/Repos/Mds
 ./Install.ps1          # Modul, Profil und globale Skripte installieren
 ```
+
+Später genügt von überall `run mds install`. Das ruft `Install.ps1` in einem eigenen pwsh-Prozess auf.
 
 Danach in einer neuen Shell:
 
@@ -82,7 +86,8 @@ Mds/
    Modul/MdsTools/            # das Modul (Manifest, SkriptModule, MdsSkripte)
    Modul/Skripte/             # globale Skripte (CloneAll, PushAll, …) → $mdsRepos
    Profile/profile.ps1        # wird nach $PROFILE kopiert
-   scripts/                   # globale run-Skripte (run backup)
+   RemoteShell.md             # Remote-Shell (woyShell.ps1, mars@/test@/prod@)
+   scripts/                   # globale run-Skripte (run backup, run mds install, run mars)
    tests/                     # Pester-Tests
 ```
 
