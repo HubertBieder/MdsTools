@@ -28,6 +28,9 @@
     Eine aeltere lokale Datei (~/.woyshell.json, ~/.woy/woyshell.json) wird beim ersten Aufruf
     dorthin verschoben. Statt der Datei geht auch WOYSHELL_TOKEN_<RECHNER>.
 
+    Schlafende Rechner (MARS): steht im Eintrag "Mac" (optional "Adresse"), wird vor dem Verbinden
+    der Port geprueft und der Rechner bei Bedarf per Wake-on-LAN geweckt (hoechstens 120 s).
+
     In der Shell:  exit / quit  beendet,  Strg+C  bricht ein laufendes Kommando ab,
     Tab  vervollstaendigt auf dem Zielrechner,  Root  springt zurueck ins Startverzeichnis.
     Interaktive Eingaben (Read-Host, Get-Credential, Editoren) gehen nicht.
@@ -94,11 +97,70 @@ if (-not $Token) {
 }
 
 if ($Merken) {
-    $konfig[$Rechner] = @{ Url = $Url; Token = $Token }
+    # weitere Angaben des Eintrags (Mac, Adresse) bleiben erhalten
+    $neu = @{} + $eintrag
+    $neu['Url'] = $Url
+    $neu['Token'] = $Token
+    $konfig[$Rechner] = $neu
     New-Item -ItemType Directory -Force -Path (Split-Path $KonfigDatei) | Out-Null
     $konfig | ConvertTo-Json | Set-Content -LiteralPath $KonfigDatei -Encoding utf8
     if (-not $IsWindows) { chmod 600 $KonfigDatei }
     Write-Host "Gespeichert in $KonfigDatei" -ForegroundColor DarkGray
+}
+#endregion
+
+#region Wecken
+# 2026-11-15 Hubi/Claude: Rechner, die meist schlafen (MARS): steht im Eintrag "Mac", wird vor dem
+# Verbinden der Port der Remote-Shell geprueft; antwortet er nicht, geht alle 15 s ein Wake-on-LAN-
+# Paket raus, bis der Port offen ist (hoechstens 120 s). "Adresse" (optional) ist die LAN-Adresse fuer
+# Pruefung und Broadcast, sonst der Rechnername aus der Url. Wie run mars (Mds/scripts/_mars.ps1).
+function Test-Port([string]$Ziel, [int]$Port, [int]$Millisekunden = 2000) {
+    $client = [Net.Sockets.TcpClient]::new()
+    try { return ($client.ConnectAsync($Ziel, $Port).Wait($Millisekunden) -and $client.Connected) }
+    catch { return $false }
+    finally { $client.Dispose() }
+}
+
+# Wake-on-LAN (6 x FF, 16 x MAC) auf UDP 7 und 9 an den allgemeinen Broadcast und an x.x.x.255 von $LanAdresse
+function Send-WakeOnLan([string]$MacAdresse, [string]$LanAdresse) {
+    $bytes = [byte[]]($MacAdresse -split '[-:]' | ForEach-Object { [Convert]::ToByte($_, 16) })
+    if ($bytes.Count -ne 6) { throw "Ungueltige MAC-Adresse fuer ${Rechner}: $MacAdresse" }
+    $paket = [byte[]](@(0xFF) * 6) + (@($bytes) * 16)
+    $udp = [Net.Sockets.UdpClient]::new()
+    try {
+        $udp.EnableBroadcast = $true
+        $ziele = @([Net.IPAddress]::Broadcast)
+        if ($LanAdresse -match '^(\d+\.\d+\.\d+)\.\d+$') { $ziele += [Net.IPAddress]::Parse("$($Matches[1]).255") }
+        foreach ($ziel in $ziele) {
+            foreach ($port in 7, 9) { [void]$udp.Send($paket, $paket.Length, [Net.IPEndPoint]::new($ziel, $port)) }
+        }
+    }
+    finally { $udp.Dispose() }
+}
+
+function Invoke-Wecken([int]$Sekunden = 120) {
+    $mac = $eintrag['Mac']
+    if (-not $mac) { return }
+    $uri = [Uri]$Url
+    $ziel = if ($eintrag['Adresse']) { $eintrag['Adresse'] } else { $uri.Host }
+    if (Test-Port $ziel $uri.Port) { return }
+
+    Write-Host "$Rechner ($ziel) antwortet nicht - Wake-on-LAN an $mac ..." -ForegroundColor Yellow
+    $start = [DateTime]::UtcNow
+    $letztes = [DateTime]::MinValue
+    while (-not (Test-Port $ziel $uri.Port)) {
+        $vergangen = ([DateTime]::UtcNow - $start).TotalSeconds
+        if ($vergangen -gt $Sekunden) {
+            throw "$Rechner ist nach $Sekunden s nicht erreichbar (Wake-on-LAN im BIOS/Netzwerkadapter aktiv? AufServiceNT laeuft?)"
+        }
+        if (([DateTime]::UtcNow - $letztes).TotalSeconds -ge 15) {
+            Send-WakeOnLan $mac $ziel
+            $letztes = [DateTime]::UtcNow
+        }
+        Write-Host ("  ... warte auf {0} ({1:N0} s)" -f $Rechner, $vergangen) -ForegroundColor DarkGray
+        Start-Sleep -Seconds 3
+    }
+    Write-Host ("{0} ist wach ({1:N0} s)" -f $Rechner, ([DateTime]::UtcNow - $start).TotalSeconds) -ForegroundColor Green
 }
 #endregion
 
@@ -309,6 +371,7 @@ function Test-UpdateBefehl([string]$Text) {
     return $Text -match '^\s*(Update|woyControlCenter\s+[-/]?(u|up|upd|upda|updat|update|d|db|dbs))\b'
 }
 
+Invoke-Wecken
 $ready = Connect-Shell
 #endregion
 

@@ -8,6 +8,7 @@
 | ---------- | ------- | -------------------- | ------------------------------------------------------------------------- |
 | 2026-11-15 | 0.1     | Hubert Bieder/Claude | Neu: Schnittstelle, Einrichtung, Befehle, Update; Aufrufe von LUNA aus    |
 | 2026-11-15 | 0.2     | Hubert Bieder/Claude | Update bei gleichem Stand: nichts zu tun, `-Force`; Neuverbinden auch nach fertigem Befehl |
+| 2026-11-15 | 0.3     | Hubert Bieder/Claude | Schlafende Rechner wecken (`Mac`, `Adresse` in `woyshell.json`), MARS wird geweckt |
 
 ## Worum es geht
 
@@ -78,6 +79,25 @@ MARS und LUNA gleich. Einrichten muss man sie also nur auf einem der beiden Rech
 
 Statt der Datei geht auch eine Umgebungsvariable `WOYSHELL_TOKEN_<RECHNER>`, z. B. `WOYSHELL_TOKEN_PROD`.
 Fehlt die Url, gilt `ws://<rechner>:60000/ServiceCtrl/Shell`.
+
+### Schlafende Rechner wecken
+
+MARS schläft meist. Steht im Eintrag eines Rechners `Mac`, prüft `woyShell.ps1` vor dem Verbinden, ob der Port
+der Remote-Shell (60000) antwortet. Antwortet er nicht, geht alle 15 s ein Wake-on-LAN-Paket raus, bis der Port
+offen ist, höchstens 120 s. Ist der Rechner wach, kostet die Prüfung nichts Merkliches.
+
+```json
+"MARS": {
+  "Url": "ws://mars:60000/ServiceCtrl/Shell",
+  "Token": "…",
+  "Mac": "F0-2F-74-8B-62-06",
+  "Adresse": "192.168.104.59"
+}
+```
+
+`Adresse` ist optional: die LAN-Adresse für die Prüfung und den Broadcast (x.x.x.255), sonst gilt der
+Rechnername aus der Url. Das Wecken ist dasselbe wie bei `run mars` (`scripts/_mars.ps1`). Nur MARS hat
+`Mac`, TEST-SRV und SQL-SRV laufen durch. `-Merken` lässt `Mac` und `Adresse` stehen.
 
 `Install.ps1` (oder `run mds install`) kopiert `woyShell.ps1` nach `$mdsRepos`. Die Profilbefehle finden es dort.
 Bis zur ersten Installation nehmen sie es direkt aus `Mds/Modul/Skripte`.
