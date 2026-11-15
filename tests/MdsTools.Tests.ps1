@@ -102,7 +102,7 @@ Describe 'Globale Variablen und Root-Ordner' {
 
     It 'Show-Mds zeigt Version, woy und alle Ordner mit Quelle' {
         $zeilen = Show-Mds 6>$null
-        $soll = @('System', 'mdsVersion', 'mdsWoy', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp')
+        $soll = @('System', 'mdsVersion', 'mdsWoy', 'mdsRepos', 'mdsRoot', 'mdsBin', 'mdsConfig', 'mdsData', 'mdsLogs', 'mdsTemp', 'mdsCloud', 'mdsWoyShell')
         if ($IsWindows) { $soll += 'mdsWoySrc', 'mdsWoyBin', 'mdsWoyRun' }
         $zeilen.Variable | Should -Be $soll
         ($zeilen | Where-Object Variable -eq 'System').Wert | Should -Be $(if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' })
@@ -110,6 +110,7 @@ Describe 'Globale Variablen und Root-Ordner' {
         ($zeilen | Where-Object Variable -eq 'mdsRepos').Quelle | Should -Be 'DEV_REPOS'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Quelle | Should -Be 'Standard'
         ($zeilen | Where-Object Variable -eq 'mdsBin').Vorhanden | Should -BeTrue
+        ($zeilen | Where-Object Variable -eq 'mdsWoyShell').Wert | Should -Match 'woyshell\.json$'
     }
 
     It 'Show-Mds -Full (-F) zeigt zusaetzlich alle exportierten Befehle mit Beschreibung und Datei' {

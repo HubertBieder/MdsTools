@@ -13,6 +13,7 @@
 #               08.11.2026 Hubi/Claude: MARS auf Anaconda 2026.07, py/py313/py315/pyb fuer Windows und macOS gleich
 #               10.11.2026 Hubi/Claude: macOS: ping sendet wie unter Windows 4 Pakete
 #               14.11.2026 Hubi/Claude: maui oeffnet den Maui-Workspace (Maui.code-workspace) in VS Code
+#               15.11.2026 Hubi/Claude: mars@, test@, prod@ oeffnen die Remote-Shell (woyShell.ps1 aus Modul/Skripte)
 #========================================================================================
 
 # MdsTools setzt beim Laden UTF-8-Ausgabe, die globalen $mds*-Variablen und den PATH auf $mdsBin.
@@ -32,6 +33,23 @@ function maui {
     $ws = Join-Path $mdsRepos 'Maui/Maui.code-workspace'
     if (Test-Path -LiteralPath $ws) { code $ws } else { Write-Warning "Workspace nicht gefunden: $ws" }
 }
+
+# 2026-11-15 Hubi/Claude: Remote-Shell auf die Rechner mit Auftragsabwicklung (AufServiceNT).
+# Adresse und Schluessel je Rechner in woyshell.json: iCloud Drive Documents/Config (alle eigenen Rechner),
+# sonst ~/.woy (einmal: woyShell.ps1 <Name> -Token ... -Merken).
+# Eigener pwsh-Prozess, damit Verlauf und Tab-Belegung dieser Sitzung unberuehrt bleiben.
+# Weitere Argumente gehen durch, z. B.  mars@ -Command 'Show'
+# ("@mars" geht nicht: ein @ vor dem Namen liest PowerShell immer als Splatting.)
+function Open-WoyShell([string] $rechner, [object[]] $rest) {
+    # Install.ps1 kopiert es nach $mdsRepos; vorher direkt aus dem Repo
+    $skript = @((Join-Path $mdsRepos 'woyShell.ps1'), (Join-Path $mdsRepos 'Mds/Modul/Skripte/woyShell.ps1')) |
+        Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $skript) { Write-Warning "woyShell.ps1 nicht gefunden (Mds/Install.ps1 ausfuehren)"; return }
+    & (Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')) -NoProfile -File $skript $rechner @rest
+}
+function mars@ { Open-WoyShell MARS $args }
+function test@ { Open-WoyShell TEST $args }
+function prod@ { Open-WoyShell PROD $args }
 
 # Anaconda-Basisordner: Windows systemweit, macOS per Homebrew (brew install --cask anaconda)
 $condaRoot = if ($IsWindows) { "C:\ProgramData\Anaconda" } elseif ($IsMacOS) { "/opt/homebrew/anaconda3" } else { $null }

@@ -13,6 +13,7 @@
 #   2026-11-03  Hubi/Claude  Windows: Legacy-Adressen $mdsWoySrc, $mdsWoyBin, $mdsWoyRun
 #   2026-11-05  Hubi/Claude  8.3: $mdsDev und DEV_HOME entfallen; Repos und Root unabhaengig
 #                            (macOS ~/Repos, ~/Root; Windows C:\woyCode, D:\Root bzw. C:\Root)
+#   2026-11-15  Hubi/Claude  $mdsCloud (iCloud Documents/Config), $mdsWoyShell (Konfiguration der Remote-Shell)
 #======================================================================
 
 # Native Programme (dotnet, git, ...) geben UTF-8 aus. Ohne UTF-8-Ausgabekodierung
@@ -69,6 +70,18 @@ $global:mdsData = Get-DevOrdner 'Data' $mdsRoot
 $global:mdsLogs = Get-DevOrdner 'Logs' $mdsRoot
 $global:mdsTemp = Get-DevOrdner 'Temp' $mdsRoot
 Remove-Item Function:Get-DevOrdner
+# 2026-11-15 Hubi/Claude: Konfiguration, die iCloud auf alle eigenen Rechner repliziert.
+#   Windows ~\iCloudDrive\Documents\Config, macOS ~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Config;
+#   DEV_CLOUD lenkt um. Wird NICHT angelegt - fehlt der Ordner, ist iCloud hier nicht eingerichtet.
+$global:mdsCloud = if ($env:DEV_CLOUD) { $env:DEV_CLOUD }
+    elseif ($IsWindows) { Join-Path $HOME 'iCloudDrive/Documents/Config' }
+    elseif ($IsMacOS) { Join-Path $HOME 'Library/Mobile Documents/com~apple~CloudDocs/Documents/Config' }
+    else { $null }
+# 2026-11-15 Hubi/Claude: Adressen und Schluessel der Remote-Shell (woyShell.ps1, Profil mars@/test@/prod@).
+#   Gleiche Reihenfolge wie in woyShell.ps1: WOYSHELL_CONFIG, sonst $mdsCloud (wenn vorhanden), sonst ~/.woy.
+$global:mdsWoyShell = if ($env:WOYSHELL_CONFIG) { $env:WOYSHELL_CONFIG }
+    elseif ($mdsCloud -and (Test-Path -LiteralPath $mdsCloud -PathType Container)) { Join-Path $mdsCloud 'woyshell.json' }
+    else { Join-Path (Join-Path $HOME '.woy') 'woyshell.json' }
 
 foreach ($ordner in $mdsRepos, $mdsRoot, $mdsBin, $mdsConfig, $mdsData, $mdsLogs, $mdsTemp) {
     if (-not (Test-Path -LiteralPath $ordner -PathType Container)) {

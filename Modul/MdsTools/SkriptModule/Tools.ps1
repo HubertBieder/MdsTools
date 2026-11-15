@@ -12,6 +12,7 @@
 #   2026-11-04  Hubi/Claude  Update-PowerShell: unter Windows nur Anzeige, Installation ueber
 #                            Update-PowerShell7.cmd (Windows PowerShell 5.1); Install-PowerShell7FromGithub entfaellt
 #   2026-11-05  Hubi/Claude  Show-Mds: Zeile mdsDev entfaellt (8.3)
+#   2026-11-15  Hubi/Claude  Show-Mds: Zeilen mdsCloud und mdsWoyShell (Remote-Shell, mit Rechnern)
 #   2026-11-11  Hubi/Claude  Update-PowerShell: Versionslinie 7.6 ($PwshLinie), -Version (auch Downgrade),
 #                            macOS immer PKG von GitHub, ohne -Last Hinweis auf neuere Version (8.3.6)
 #
@@ -525,6 +526,27 @@ function Show-Mds {
             Quelle    = if ([Environment]::GetEnvironmentVariable($env)) { $env } else { 'Standard' }
             Vorhanden = [bool]($wert -and (Test-Path -LiteralPath $wert -PathType Container))
         }
+    }
+
+    # 2026-11-15 Hubi/Claude: iCloud-Konfiguration und Remote-Shell (woyShell.ps1)
+    [pscustomobject]@{
+        Variable  = 'mdsCloud'
+        Wert      = $mdsCloud
+        Quelle    = if ($env:DEV_CLOUD) { 'DEV_CLOUD' } else { 'iCloud Drive' }
+        Vorhanden = [bool]($mdsCloud -and (Test-Path -LiteralPath $mdsCloud -PathType Container))
+    }
+    $shellRechner = ''
+    if ($mdsWoyShell -and (Test-Path -LiteralPath $mdsWoyShell -PathType Leaf)) {
+        try { $shellRechner = ((Get-Content -LiteralPath $mdsWoyShell -Raw | ConvertFrom-Json -AsHashtable).Keys | Sort-Object) -join ', ' } catch { $shellRechner = '?' }
+    }
+    $shellQuelle = if ($env:WOYSHELL_CONFIG) { 'WOYSHELL_CONFIG' }
+        elseif ($mdsCloud -and $mdsWoyShell.StartsWith($mdsCloud, [StringComparison]::OrdinalIgnoreCase)) { 'mdsCloud' }
+        else { '~/.woy' }
+    [pscustomobject]@{
+        Variable  = 'mdsWoyShell'
+        Wert      = $mdsWoyShell
+        Quelle    = if ($shellRechner) { "$shellQuelle ($shellRechner)" } else { $shellQuelle }
+        Vorhanden = [bool]($mdsWoyShell -and (Test-Path -LiteralPath $mdsWoyShell -PathType Leaf))
     }
 
     # 2026-11-03 Hubi/Claude: Legacy-Adressen der Auftragsabwicklung, nur unter Windows

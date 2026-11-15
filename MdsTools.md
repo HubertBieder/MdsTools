@@ -46,6 +46,7 @@
 | 2026-11-08 | 0.40    | Hubert Bieder/Claude | 8.3.5: `go home` nach `~`                                                                 |
 | 2026-11-11 | 0.41    | Hubert Bieder/Claude | 8.3.6: PowerShell-Linie 7.6 (`Update-PowerShell -Last`/`-Version`, `Update-PowerShell7.ps1 -Linie`) |
 | 2026-11-12 | 0.42    | Hubert Bieder/Claude | 8.4.0: `Save-Desktop`/`Restore-Desktop` für Desktop-Symbole, Datei je Rechner (`luna.json`, `mars.json`) |
+| 2026-11-15 | 0.43    | Hubert Bieder/Claude | `$mdsCloud` (iCloud `Documents/Config`), `$mdsWoyShell` (Remote-Shell) und ihre Zeilen in `Show-Mds`; `woyShell.ps1` unter `Modul/Skripte` |
 
 ---
 
@@ -141,6 +142,7 @@ wie `Resolve-MdsPath` müssen nicht exportiert werden.
 ```
 
 `Modul/Skripte/` wird von `Install.ps1` nach `$mdsRepos` kopiert, aber nur, wenn die Quelle neuer ist.
+Dazu gehört `woyShell.ps1`, der Client der Remote-Shell von AufServiceNT (Profil: `mars@`, `test@`, `prod@`).
 
 ## Initialisierung und Ablauf
 
@@ -167,8 +169,14 @@ unter macOS, flach unter `C:\woyCode` unter Windows) beschreibt
 | `$mdsData`    | `$mdsRoot/Data`     | `$mdsRoot\Data`     | Laufzeitdaten der Services                   |
 | `$mdsLogs`    | `$mdsRoot/Logs`     | `$mdsRoot\Logs`     | Protokolle                                   |
 | `$mdsTemp`    | `$mdsRoot/Temp`     | `$mdsRoot\Temp`     | Zwischendateien, Freigabe-Mounts (macOS)     |
+| `$mdsCloud`   | iCloud ²            | iCloud ²            | Konfiguration für alle eigenen Rechner (`DEV_CLOUD`), wird nicht angelegt |
+| `$mdsWoyShell`| `woyshell.json` ³   | `woyshell.json` ³   | Adressen und Schlüssel der Remote-Shell (`mars@`, `test@`, `prod@`) |
 
 ¹ Wenn es ein Laufwerk D: gibt (MARS); sonst `C:\Root`. Fehlende Ordner legt MdsTools beim Laden an.
+² `Documents/Config` in iCloud Drive: Windows `~\iCloudDrive\Documents\Config`, macOS
+`~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Config`.
+³ `WOYSHELL_CONFIG`, sonst `$mdsCloud/woyshell.json` (wenn `$mdsCloud` existiert), sonst `~/.woy/woyshell.json`.
+`Show-Mds` nennt in der Spalte Quelle auch die eingetragenen Rechner.
 
 Nur unter Windows gibt es zusätzlich die **Legacy-Adressen der Auftragsabwicklung**. Sie sind fest und absolut
 (es gibt keinen weiteren Rechner mit woy), werden nicht umgelenkt und nicht angelegt; unter macOS fehlen sie.
