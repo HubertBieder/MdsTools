@@ -344,8 +344,9 @@ try {
         $psrl = @{
             HistorySavePath  = $o.HistorySavePath
             PredictionSource = $o.PredictionSource
-            Tab              = (Get-PSReadLineKeyHandler -Chord Tab | Select-Object -First 1).Function
-            ShiftTab         = (Get-PSReadLineKeyHandler -Chord Shift+Tab | Select-Object -First 1).Function
+            # macOS/Linux (Emacs-Modus): Shift+Tab ist nicht belegt -> $null statt Abbruch unter StrictMode
+            Tab              = Get-PSReadLineKeyHandler -Chord Tab | Select-Object -First 1 -ExpandProperty Function
+            ShiftTab         = Get-PSReadLineKeyHandler -Chord Shift+Tab | Select-Object -First 1 -ExpandProperty Function
         }
         New-Item -ItemType Directory -Force -Path $WoyDir | Out-Null
         Set-PSReadLineOption -HistorySavePath (Join-Path $WoyDir "woyshell_history_$Rechner.txt") -PredictionSource None
@@ -387,8 +388,9 @@ try {
 finally {
     if ($psrl) {
         Set-PSReadLineOption -HistorySavePath $psrl.HistorySavePath -PredictionSource $psrl.PredictionSource
-        if ($psrl.Tab) { Set-PSReadLineKeyHandler -Chord Tab -Function $psrl.Tab }
-        if ($psrl.ShiftTab) { Set-PSReadLineKeyHandler -Chord Shift+Tab -Function $psrl.ShiftTab }
+        # vorher unbelegte Taste wieder freigeben, sonst bliebe die Remote-Vervollstaendigung lokal haengen
+        if ($psrl.Tab) { Set-PSReadLineKeyHandler -Chord Tab -Function $psrl.Tab } else { Remove-PSReadLineKeyHandler -Chord Tab }
+        if ($psrl.ShiftTab) { Set-PSReadLineKeyHandler -Chord Shift+Tab -Function $psrl.ShiftTab } else { Remove-PSReadLineKeyHandler -Chord Shift+Tab }
         if ($altPrompt) { $function:global:prompt = $altPrompt }
         Remove-Variable -Name woyShellPrompt -Scope Global -ErrorAction SilentlyContinue
     }
