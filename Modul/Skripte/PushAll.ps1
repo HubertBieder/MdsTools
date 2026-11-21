@@ -8,6 +8,8 @@
       2. git fetch und prüfen, ob der Server neuere Commits hat
          -> ja: kein Push, Hinweis auf CloneAll.ps1 (pull)
          -> nein: git push, falls lokale Commits vorhanden sind
+    3. Nur macOS: ~/Root/Config wird nach iCloud Drive/Backup/Config kopiert
+       (Konfigurationsdateien, die nicht in Git, sondern nur über iCloud gesichert werden).
     macOS/Linux: Repos ist der Ordner, in dem das Skript liegt (~/Repos).
     Windows:     feste Basis C:\woyCode, die Repos liegen direkt darin (wie CloneAll und $mdsRepos).
     $env:DEV_REPOS übersteuert.
@@ -18,9 +20,13 @@
 .PARAMETER Message
     Commit-Nachricht. Standard: "Update <Datum Uhrzeit> von <Rechner>"
 
+.PARAMETER SkipConfigBackup
+    Kopieren von ~/Root/Config nach iCloud überspringen.
+
 .EXAMPLE
     ./PushAll.ps1
     ./PushAll.ps1 -Repos Net, Maui -Message "Neue Logging-Klasse"
+    ./PushAll.ps1 -SkipConfigBackup
 
 .NOTES
     Version  Datum       Wer           Was
@@ -31,14 +37,16 @@
                                        Abbruch, wenn der Repos-Ordner fehlt
     2.3.0    2026-11-04  Hubi/Claude   Im Repo unter Modul/Skripte (statt Skripte)
     2.4.0    2026-11-05  Hubi/Claude   Ohne Dev-Ordner: Skript liegt direkt in Repos (~/Repos), DEV_HOME entfällt
+    2.5.0    2026-11-21  Hubi/Claude   macOS: ~/Root/Config nach iCloud Drive/Backup/Config kopieren (-SkipConfigBackup)
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @(),
-    [string]$Message
+    [string]$Message,
+    [switch]$SkipConfigBackup
 )
 
-$ScriptVersion = '2.4.0'
+$ScriptVersion = '2.5.0'
 
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
@@ -126,3 +134,29 @@ $result = foreach ($repo in $Repos) {
 
 Write-Host ''
 $result | Format-Table -AutoSize
+
+# --- 3. Config-Backup nach iCloud (nur macOS/LUNA).
+#     2026-11-21 Hubi/Claude: ~/Root/Config liegt nicht in Git und wird nur über iCloud gesichert.
+#     Es wird nur kopiert/überschrieben, im Backup wird nichts gelöscht. ---
+if ($IsMacOS -and -not $SkipConfigBackup) {
+    $configSrc = Join-Path $HOME 'Root/Config'
+    $configDst = Join-Path $HOME 'Library/Mobile Documents/com~apple~CloudDocs/Backup/Config'
+
+    Write-Host "=== Config-Backup: $configSrc -> iCloud Drive/Backup/Config" -ForegroundColor Yellow
+    if (-not (Test-Path -LiteralPath $configSrc -PathType Container)) {
+        Write-Warning "$configSrc nicht gefunden - kein Config-Backup."
+    }
+    else {
+        try {
+            New-Item -ItemType Directory -Path $configDst -Force -ErrorAction Stop | Out-Null
+            # -Force bei Get-ChildItem, damit auch versteckte Dateien (.xyz) mitkommen
+            Get-ChildItem -LiteralPath $configSrc -Force |
+                Copy-Item -Destination $configDst -Recurse -Force -ErrorAction Stop
+            $count = (Get-ChildItem -LiteralPath $configSrc -Recurse -File -Force).Count
+            Write-Host "Config-Backup fertig ($count Dateien)." -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Config-Backup fehlgeschlagen: $($_.Exception.Message)"
+        }
+    }
+}
