@@ -20,9 +20,15 @@
     6.1.0    2026-11-04  Hubi/Claude   Globale Skripte aus Modul/Skripte; Kopf-/Schlusszeile mit Modulversion
     6.2.0    2026-11-05  Hubi/Claude   Globale Skripte nach $mdsRepos ($mdsDev entfaellt, 8.3)
     6.3.0    2026-11-05  Hubi/Claude   Pruefung auf mdsPackage entfernt
+    6.4.0    2026-11-21  Hubi/Claude   Laeuft auch in der woyShell/Remote-Sitzung (ohne $PROFILE): installiert
+                                       fuer das Konto der Sitzung (InstallHelper.ps1 Get-ProfileRoot)
 #>
 [CmdletBinding()]
 param()
+
+# 2026-11-21 Hubi/Claude: In Remote-Sitzungen (woyShell [MARS*], PSSession) gibt es kein $PROFILE.
+# Installiert wird dann fuer das Konto, unter dem die Sitzung laeuft (Pfade: InstallHelper.ps1).
+$script:RemoteSession = -not $PROFILE
 
 # Angezeigt wird die Modulversion aus dem Manifest im Repo (einzige Versionsnummer, A2).
 $ModulVersion = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'Modul/MdsTools/MdsTools.psd1')).ModuleVersion
@@ -141,6 +147,9 @@ function Install-WoyEnv() {
 }
 
 Write-Host "================= MdsTools installieren ==========================  V$ModulVersion  ====="
+if ($script:RemoteSession) {
+    Write-Host -ForegroundColor DarkYellow "Remote-Sitzung ohne `$PROFILE - Installation fuer Konto $([Environment]::UserDomainName)\$([Environment]::UserName)"
+}
 if (-not (Install-MdsModule)) {
     Write-Host -ForegroundColor Red "Installation abgebrochen."
     return

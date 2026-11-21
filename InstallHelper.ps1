@@ -5,6 +5,7 @@
 #
 # Versionshistorie:
 #   2026-10-31  Hubi/Claude  Aus Install.ps1 ausgelagert
+#   2026-11-21  Hubi/Claude  Get-ProfileRoot ohne $PROFILE (woyShell/Remote-Sitzung): Standardpfad ableiten
 #======================================================================
 
 function Get-UserHome() {
@@ -22,7 +23,17 @@ function Get-UserHome() {
 
 function Get-ProfileRoot() {
     # Windows: ...\Documents\PowerShell   macOS: ~/.config/powershell
-    $base = Split-Path $PROFILE.CurrentUserAllHosts
+    # Ohne $PROFILE (woyShell, PSSession) denselben Ordner ableiten, den PowerShell selbst nimmt:
+    #   Windows: <Dokumente des Kontos>\PowerShell   macOS/Linux: ~/.config/powershell
+    if ($PROFILE) {
+        $base = Split-Path $PROFILE.CurrentUserAllHosts
+    }
+    elseif ($IsWindows) {
+        $base = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell'
+    }
+    else {
+        $base = Join-Path $HOME '.config/powershell'
+    }
     # Zeigt der Profilpfad noch auf ein abweichendes $HOME (siehe Get-UserHome),
     # auf %USERPROFILE% umbiegen, damit Profil und Module im echten Profil landen.
     $userHome = Get-UserHome

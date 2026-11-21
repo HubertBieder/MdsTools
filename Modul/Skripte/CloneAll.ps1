@@ -37,15 +37,19 @@
     3.6.0    2026-11-10  Claude/Hubi   Am Ende Set-RepoColors.ps1: VS-Code-Farben je Repo-Typ
                                        (C# lila, Python gold, PowerShell blau)
     3.7.0    2026-11-21  Hubi/Claude   WinForms-Auftragsabwicklung woyV26 -> Repos/Auf
+    3.8.0    2026-11-21  Hubi/Claude   URL ohne Benutzername (vermeidet "Umleitung nach ..."-Warnung);
+                                       origin vorhandener Repos wird auf die richtige URL korrigiert
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.7.0'
+$ScriptVersion = '3.8.0'
 $GitHubUser    = 'HubertBieder'
-$GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
+# 2026-11-21 Hubi/Claude: ohne "User@" in der URL - GitHub leitet sonst um (Warnung bei jedem fetch/pull).
+#            Die Anmeldung läuft über den Credential-Helper.
+$GitHubBase    = "https://github.com/$GitHubUser/"
 
 # --- Repo-Tabelle: GitHub-Repo -> lokaler Kurzname (MDS-Development.md) ---
 $RepoTable = [ordered]@{
@@ -126,6 +130,13 @@ $result = foreach ($repo in $auswahl.Keys) {
             Write-Warning "$kurz hat lokale Änderungen ($(@($dirty).Count) Dateien) - übersprungen. Erst committen (PushAll.ps1)."
             [pscustomobject]@{ Repo = $kurz; GitHub = $repo; Status = 'Übersprungen (lokale Änderungen)' }
             continue
+        }
+        # 2026-11-21 Hubi/Claude: origin auf die richtige URL setzen (alte Klone hatten "HubertBieder@" drin)
+        $sollUrl = "$GitHubBase$repo.git"
+        $istUrl  = git -C $target remote get-url origin 2>$null
+        if ($istUrl -ne $sollUrl) {
+            Write-Host "origin korrigiert: $istUrl -> $sollUrl" -ForegroundColor DarkYellow
+            git -C $target remote set-url origin $sollUrl
         }
         $vorher = git -C $target rev-parse HEAD
         git -C $target pull --ff-only
