@@ -32,7 +32,8 @@
     der Port geprueft und der Rechner bei Bedarf per Wake-on-LAN geweckt (hoechstens 120 s).
 
     In der Shell:  exit / quit  beendet,  Strg+C  bricht ein laufendes Kommando ab,
-    Tab  vervollstaendigt auf dem Zielrechner,  Root  springt zurueck ins Startverzeichnis.
+    Tab  vervollstaendigt auf dem Zielrechner,  Root  springt zurueck ins Startverzeichnis,
+    cls / clear  loescht den Bildschirm (lokal).
     Interaktive Eingaben (Read-Host, Get-Credential, Editoren) gehen nicht.
 
 .EXAMPLE
@@ -434,6 +435,8 @@ try {
         $zeile = $zeile.TrimEnd()
         if ($zeile.Trim() -in 'exit', 'quit', 'logout') { break }
         if ($zeile.Trim().Length -eq 0) { continue }
+        # 2026-11-21 Hubi/Claude: Bildschirm loeschen lokal - im Dienst gibt es keine Konsole (Clear-Host scheitert dort)
+        if ($zeile.Trim() -in 'cls', 'clear', 'Clear-Host') { Clear-Host; continue }
         $ok = Invoke-Remote $zeile
         if ($script:wiederverbinden -or ($null -eq $ok -and (Test-UpdateBefehl $zeile))) {
             if (Wait-Wiederverbinden) { continue }
