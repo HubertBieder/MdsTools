@@ -15,6 +15,7 @@
 | 2026-11-05 | 1.4     | Hubert Bieder/Claude | Offene Punkte: C# auf 8.3 und mdsPackage erledigt, `Auf` präzisiert; Rezept LUNA mit Befehlen (MdsTools 8.3.1) |
 | 2026-11-05 | 1.5     | Hubert Bieder/Claude | Erledigtes LUNA-Rezept entfernt; MdsTools-Migration.md entfällt; offene Punkte und Rezept MARS in Luna.md/Mars.md |
 | 2026-11-05 | 1.6     | Hubert Bieder/Claude | Nur aktueller Stand: Erledigt-Liste, Dev-Hinweise und mdsPackage entfernt |
+| 2026-11-21 | 1.7     | Hubert Bieder/Claude | `Auf` (woyV26) in CloneAll, auch auf LUNA; WinForms auf dem Mac |
 
 ## Inhalt und Abgrenzung
 
@@ -72,6 +73,7 @@ Groß-/Kleinschreibung).
    Net/               # NetCoreLib2026
    Maui/              # NetMauiApps
    PHB/               # PythonHB
+   Auf/               # woyV26
 
 ~/Root/               # $mdsRoot  (/Users/hubert/Root)
    Bin/               # ausführbare Tools, gebaute CLIs/Services (im PATH)
@@ -148,7 +150,7 @@ gilt der Standard aus der Tabelle oben.
 | `Net`             | NetCoreLib2026             | C#-Basisklassen, Services, CLIs                |
 | `Maui`            | NetMauiApps                | .NET-MAUI-Apps für alle Systeme                |
 | `PHB`             | PythonHB                   | Python                                         |
-| `Auf`             | woyV26                     | Auftragsabwicklung (nur Windows)               |
+| `Auf`             | woyV26                     | Auftragsabwicklung (WinForms)                  |
 
 Unter Windows liegen unter `C:\woyCode` zusätzlich weitere woy-Repos.
 
@@ -193,6 +195,7 @@ $Repos = [ordered]@{
     'NetCoreLib2026' = 'Net'
     'NetMauiApps'    = 'Maui'
     'PythonHB'       = 'PHB'
+    'woyV26'         = 'Auf'
 }
 ```
 
@@ -256,6 +259,23 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
 - In pwsh: `Get-ChildItem -Force`.
 - Neuer Ordner im Finder: **⌘ ⇧ N**.
 - Der macOS-Spotlight-Dienst heißt ebenfalls `mds` – kein Konflikt, da kein Programm `mds` im PATH liegt.
+
+### WinForms auf dem Mac (Auf)
+
+Die Auftragsabwicklung (`Auf`, WinForms/WPF, `net10.0-windows`) wird auf LUNA nur **gelesen und bearbeitet**;
+gebaut, gestartet und im Designer bearbeitet wird sie auf MARS mit Visual Studio.
+
+- Holen: `clone` bzw. `CloneAuf.ps1` → `~/Repos/Auf`.
+- Zeilenenden: `.gitattributes` mit `* text=auto` – im Repo LF, unter Windows CRLF, auf dem Mac LF. Die
+  `.editorconfig` (`end_of_line = crlf` für `*.cs`) ändert daran nichts, Git normalisiert beim Commit. Kein
+  `eol=crlf` nötig.
+- `.gitignore`: Visual-Studio-Vorlage (`bin/`, `obj/`, `.vs/`, `*.user`) plus `Config/FritzBox.Config`
+  und `.DS_Store`. `.vscode/` ist eingecheckt (C#-Farben wie Set-RepoColors).
+- Designer: `*.Designer.cs` (`InitializeComponent`) und `*.resx` nur in Visual Studio ändern. Auf dem Mac nur
+  Logik-Code (Ereignisse, Klassen, Libs) bearbeiten.
+- Bauen: `mk` lehnt Windows-Projekte unter macOS ab. `dotnet build -p:EnableWindowsTargeting=true` scheitert
+  am Restore: `nuget.config` verweist auf die lokalen Infragistics-Pakete `..\Infragistics\WinForm24`, die nur
+  auf Windows liegen. Compilerprüfung daher auf MARS.
 
 ### Allgemein
 

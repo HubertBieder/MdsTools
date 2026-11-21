@@ -13,7 +13,7 @@
     $env:DEV_REPOS übersteuert.
 
 .PARAMETER Repos
-    Kurznamen oder GitHub-Namen. Standard: alle aus der Repo-Tabelle (Mds, Net, Maui, PHB).
+    Kurznamen oder GitHub-Namen. Standard: alle aus der Repo-Tabelle (Mds, Net, Maui, PHB, Auf).
 
 .EXAMPLE
     ./CloneAll.ps1
@@ -36,13 +36,14 @@
                                        Status 'Aktuell', wenn der pull nichts geholt hat
     3.6.0    2026-11-10  Claude/Hubi   Am Ende Set-RepoColors.ps1: VS-Code-Farben je Repo-Typ
                                        (C# lila, Python gold, PowerShell blau)
+    3.7.0    2026-11-21  Hubi/Claude   WinForms-Auftragsabwicklung woyV26 -> Repos/Auf
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.6.0'
+$ScriptVersion = '3.7.0'
 $GitHubUser    = 'HubertBieder'
 $GitHubBase    = "https://$GitHubUser@github.com/$GitHubUser/"
 
@@ -52,6 +53,7 @@ $RepoTable = [ordered]@{
     'NetCoreLib2026' = 'Net'
     'NetMauiApps'    = 'Maui'
     'PythonHB'       = 'PHB'
+    'woyV26'         = 'Auf'
 }
 
 # --- Betriebssystem erkennen (auch Windows PowerShell 5.1) ---
