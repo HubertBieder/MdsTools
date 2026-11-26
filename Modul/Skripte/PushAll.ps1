@@ -8,6 +8,8 @@
       2. git fetch und prüfen, ob der Server neuere Commits hat
          -> ja: kein Push, Hinweis auf CloneAll.ps1 (pull)
          -> nein: git push, falls lokale Commits vorhanden sind
+    Auf (Auftragsabwicklung) wird nur unter Windows committet und gepusht; auf macOS ist es ein Spiegel
+    und wird übersprungen.
     3. Nur macOS: ~/Root/Config wird nach iCloud Drive/Backup/Config kopiert
        (Konfigurationsdateien, die nicht in Git, sondern nur über iCloud gesichert werden).
     macOS/Linux: Repos ist der Ordner, in dem das Skript liegt (~/Repos).
@@ -38,6 +40,8 @@
     2.3.0    2026-11-04  Hubi/Claude   Im Repo unter Modul/Skripte (statt Skripte)
     2.4.0    2026-11-05  Hubi/Claude   Ohne Dev-Ordner: Skript liegt direkt in Repos (~/Repos), DEV_HOME entfällt
     2.5.0    2026-11-21  Hubi/Claude   macOS: ~/Root/Config nach iCloud Drive/Backup/Config kopieren (-SkipConfigBackup)
+    2.6.0    2026-11-26  Hubi/Claude   Auf wird nur unter Windows committet/gepusht; auf macOS/Linux ist es ein
+                                       Spiegel und wird übersprungen (Warnung bei lokalen Änderungen)
 #>
 [CmdletBinding()]
 param(
@@ -46,7 +50,12 @@ param(
     [switch]$SkipConfigBackup
 )
 
-$ScriptVersion = '2.5.0'
+$ScriptVersion = '2.6.0'
+
+# 2026-11-26 Hubi/Claude: Repos, die nur unter Windows (MARS) geändert werden. Auf macOS/Linux sind sie
+# ein reiner Spiegel (CloneAll holt sie), PushAll committet und pusht dort nichts - sonst entstehen auf
+# dem Server Commits vom Mac und der Push von MARS wird abgelehnt.
+$NurWindows = @('Auf')
 
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 $osName    = if ($onWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } else { 'Linux' }
@@ -96,6 +105,21 @@ $result = foreach ($repo in $Repos) {
     if (-not (Test-Path (Join-Path $target '.git'))) {
         Write-Warning "$repo ist nicht vorhanden oder kein Git-Repository - übersprungen."
         [pscustomobject]@{ Repo = $repo; Commit = '-'; Push = 'Übersprungen (kein Repo)' }
+        continue
+    }
+
+    # 2026-11-26 Hubi/Claude: Spiegel-Repos (nur Windows) auf macOS/Linux überspringen
+    if (-not $onWindows -and $NurWindows -contains $repo) {
+        $offen = @(git -C $target status --porcelain).Count
+        if ($offen -gt 0) {
+            Write-Warning ("$repo ist hier nur ein Spiegel, hat aber $offen geänderte Dateien - sie werden nicht " +
+                           "committet. Verwerfen: git -C $target restore . (neue Dateien: git clean -fd), sonst " +
+                           "überspringt CloneAll.ps1 das Repo.")
+        }
+        else {
+            Write-Host "$repo wird nur unter Windows geändert - hier Spiegel, übersprungen."
+        }
+        [pscustomobject]@{ Repo = $repo; Commit = '-'; Push = 'Übersprungen (Spiegel, nur Windows)' }
         continue
     }
 

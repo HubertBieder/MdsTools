@@ -16,6 +16,7 @@
 | 2026-11-05 | 1.5     | Hubert Bieder/Claude | Erledigtes LUNA-Rezept entfernt; MdsTools-Migration.md entfällt; offene Punkte und Rezept MARS in Luna.md/Mars.md |
 | 2026-11-05 | 1.6     | Hubert Bieder/Claude | Nur aktueller Stand: Erledigt-Liste, Dev-Hinweise und mdsPackage entfernt |
 | 2026-11-21 | 1.7     | Hubert Bieder/Claude | `Auf` (woyV26) in CloneAll, auch auf LUNA; WinForms auf dem Mac |
+| 2026-11-26 | 1.8     | Hubert Bieder/Claude | `Auf` auf LUNA nur Spiegel: Änderungen nur auf MARS, PushAll überspringt `Auf` unter macOS |
 
 ## Inhalt und Abgrenzung
 
@@ -262,17 +263,18 @@ Jede Änderung wird im Kommentar vermerkt: wann / wer / was, z. B. `# 2026-11-03
 
 ### WinForms auf dem Mac (Auf)
 
-Die Auftragsabwicklung (`Auf`, WinForms/WPF, `net10.0-windows`) wird auf LUNA nur **gelesen und bearbeitet**;
-gebaut, gestartet und im Designer bearbeitet wird sie auf MARS mit Visual Studio.
+Die Auftragsabwicklung (`Auf`, WinForms/WPF, `net10.0-windows`) ist auf LUNA nur ein **Spiegel zum Lesen**.
+Geändert, gebaut, gestartet und im Designer bearbeitet wird sie ausschließlich auf MARS mit Visual Studio;
+alle Commits in `Auf` kommen von MARS.
 
 - Holen: `clone` bzw. `CloneAuf.ps1` → `~/Repos/Auf`.
+- `PushAll.ps1` überspringt `Auf` unter macOS (kein Commit, kein Push) und warnt, wenn der Spiegel lokale
+  Änderungen hat. Diese verwerfen (`git restore .`), sonst überspringt CloneAll das Repo.
 - Zeilenenden: `.gitattributes` mit `* text=auto` – im Repo LF, unter Windows CRLF, auf dem Mac LF. Die
   `.editorconfig` (`end_of_line = crlf` für `*.cs`) ändert daran nichts, Git normalisiert beim Commit. Kein
   `eol=crlf` nötig.
 - `.gitignore`: Visual-Studio-Vorlage (`bin/`, `obj/`, `.vs/`, `*.user`) plus `Config/FritzBox.Config`
   und `.DS_Store`. `.vscode/` ist eingecheckt (C#-Farben wie Set-RepoColors).
-- Designer: `*.Designer.cs` (`InitializeComponent`) und `*.resx` nur in Visual Studio ändern. Auf dem Mac nur
-  Logik-Code (Ereignisse, Klassen, Libs) bearbeiten.
 - Bauen: `mk` lehnt Windows-Projekte unter macOS ab. `dotnet build -p:EnableWindowsTargeting=true` scheitert
   am Restore: `nuget.config` verweist auf die lokalen Infragistics-Pakete `..\Infragistics\WinForm24`, die nur
   auf Windows liegen. Compilerprüfung daher auf MARS.
