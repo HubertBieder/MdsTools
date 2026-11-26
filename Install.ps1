@@ -22,6 +22,8 @@
     6.3.0    2026-11-05  Hubi/Claude   Pruefung auf mdsPackage entfernt
     6.4.0    2026-11-21  Hubi/Claude   Laeuft auch in der woyShell/Remote-Sitzung (ohne $PROFILE): installiert
                                        fuer das Konto der Sitzung (InstallHelper.ps1 Get-ProfileRoot)
+    6.5.0    2026-11-26  Hubi/Claude   Abbruch, wenn der Benutzer-Modulordner nicht ermittelt werden kann
+                                       (sonst kopiert Copy-Item das Modul als "MdsTools" ins aktuelle Verzeichnis)
 #>
 [CmdletBinding()]
 param()
@@ -44,7 +46,14 @@ $script:ObsoleteScripts = @('UpdatePS.ps1')
 
 function Install-MdsModule() {
     $sourceDir = Join-Path $script:RepoRoot 'Modul/MdsTools'
-    $targetDir = Join-Path (Get-CurrentUserModuleDir) 'MdsTools'
+    # 2026-11-26 Hubi/Claude: Ohne Modulordner abbrechen. Am 21.11. (Remote-Sitzung ohne $PROFILE, vor 6.4.0)
+    # war er leer; Copy-Item mit leerem Ziel legte dann C:\woyCode\MdsTools im aktuellen Verzeichnis an.
+    $moduleDir = Get-CurrentUserModuleDir
+    if ([string]::IsNullOrWhiteSpace($moduleDir) -or -not [System.IO.Path]::IsPathFullyQualified($moduleDir)) {
+        Write-Host -ForegroundColor Red "Benutzer-Modulordner nicht ermittelbar ('$moduleDir') - Modul wird nicht kopiert."
+        return $false
+    }
+    $targetDir = Join-Path $moduleDir 'MdsTools'
     Write-Host "---   von [$sourceDir] ==> [$targetDir]   -----------------------------"
     if (-not (Test-Path -Path $sourceDir -PathType Container)) {
         Write-Host -ForegroundColor Red "Quellverzeichnis fehlt: $sourceDir"

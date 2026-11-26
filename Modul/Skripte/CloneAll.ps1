@@ -39,13 +39,15 @@
     3.7.0    2026-11-21  Hubi/Claude   WinForms-Auftragsabwicklung woyV26 -> Repos/Auf
     3.8.0    2026-11-21  Hubi/Claude   URL ohne Benutzername (vermeidet "Umleitung nach ..."-Warnung);
                                        origin vorhandener Repos wird auf die richtige URL korrigiert
+    3.9.0    2026-11-26  Hubi/Claude   Warnung, wenn neben den Repos Ordner mit GitHub-/Altnamen liegen
+                                       (MdsTools, NetCoreLib ...) - geklont wird immer nur nach <Kurzname>
 #>
 [CmdletBinding()]
 param(
     [string[]]$Repos = @()
 )
 
-$ScriptVersion = '3.8.0'
+$ScriptVersion = '3.9.0'
 $GitHubUser    = 'HubertBieder'
 # 2026-11-21 Hubi/Claude: ohne "User@" in der URL - GitHub leitet sonst um (Warnung bei jedem fetch/pull).
 #            Die Anmeldung läuft über den Credential-Helper.
@@ -59,6 +61,10 @@ $RepoTable = [ordered]@{
     'PythonHB'       = 'PHB'
     'woyV26'         = 'Auf'
 }
+
+# 2026-11-26 Hubi/Claude: Frühere Ordnernamen, die es neben den Kurznamen nicht mehr geben soll
+# (zusätzlich zu den GitHub-Namen aus der Repo-Tabelle). Nur für die Warnung am Ende.
+$AlteNamen = @('NetCoreLib', 'mdsPackage')
 
 # --- Betriebssystem erkennen (auch Windows PowerShell 5.1) ---
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
@@ -166,6 +172,20 @@ $result = foreach ($repo in $auswahl.Keys) {
 Write-Host ''
 $result | Format-Table -AutoSize | Out-Host
 Write-Host "Zielverzeichnis: $ReposDir" -ForegroundColor Cyan
+
+# --- Ordner mit GitHub- oder Altnamen neben den Repos melden ---
+# 2026-11-26 Hubi/Claude: CloneAll klont nur nach <Kurzname> (Mds, Net ...). Liegt daneben ein Ordner
+# MdsTools, NetCoreLib o. ä., stammt er von einem anderen Werkzeug (alter fester Pfad, fehlgeschlagene
+# Installation). Er wird nur gemeldet, nie gelöscht.
+foreach ($name in @($RepoTable.Keys) + $AlteNamen) {
+    if ($RepoTable.Values -contains $name) { continue }
+    $fremd = Join-Path $ReposDir $name
+    if (-not (Test-Path -LiteralPath $fremd -PathType Container)) { continue }
+    $kurz    = if ($RepoTable.Contains($name)) { $RepoTable[$name] } else { $null }
+    $hinweis = if ($kurz) { "das Repo liegt unter $(Join-Path $ReposDir $kurz)" } else { 'früherer Ordnername' }
+    $art     = if (Test-Path -LiteralPath (Join-Path $fremd '.git')) { 'Git-Repository' } else { 'kein Git-Repository' }
+    Write-Warning "$fremd gehört nicht hierher ($hinweis; $art). Bitte prüfen und löschen."
+}
 
 # --- Mds geaendert: MdsTools sofort neu installieren (Modul, Profil, globale Skripte) ---
 # 2026-11-06 Hubi/Claude: erstellt
